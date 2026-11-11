@@ -467,8 +467,8 @@ function cameraLoop() {
       setFaces(smoothFaces(found));
       if (missed > 10) toast("");
       missed = 0;
-      // find hair a few times a second (it changes slowly next to the face itself)
-      if (occ.ready && !occBusy && frameNo++ % 3 === 0) {
+      // look for hair and hands in front of the face on every other frame
+      if (occ.ready && !occBusy && frameNo++ % 2 === 0) {
         occBusy = true;
         occ.video(video, probesFor(state.faces, state.mirror)).finally(() => { occBusy = false; });
       }
@@ -830,7 +830,12 @@ enableRadioKeys($("#tones"));
 
 // Start fetching the face tracker right away (skipped when the phone asks to save data)
 if (!(navigator.connection && navigator.connection.saveData)) {
-  const warm = () => ensureLandmarker().then(() => blender && occ.load()).catch(() => {});
+  // face tracker first, then hair (under 1 MB), then hands (about 8 MB, skipped on slow connections)
+  const slow = navigator.connection && /^(slow-2g|2g|3g)$/.test(navigator.connection.effectiveType || "");
+  const warm = () => ensureLandmarker()
+    .then(() => blender && occ.load())
+    .then(() => blender && !slow && occ.loadHands())
+    .catch(() => {});
   if ("requestIdleCallback" in window) requestIdleCallback(warm, { timeout: 4000 });
   else setTimeout(warm, 2000);
 }
