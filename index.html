@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b1410" />
+  <title>Thanakha Selfie</title>
+  <meta name="description" content="Try on Myanmar thanakha with your camera — choose round, leaf, comb lines and more." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mm">သနပ်ခါး</span>
+        <span class="brand-en">Thanakha Selfie</span>
+      </div>
+      <button id="btnSwitch" class="icon-btn" title="Use camera / photo" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M4 7h3l2-2h6l2 2h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Zm8 3a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/></svg>
+      </button>
+    </header>
+
+    <section class="stage" id="stage">
+      <video id="video" playsinline muted autoplay></video>
+      <canvas id="view"></canvas>
+
+      <div class="intro" id="intro">
+        <div class="intro-card">
+          <div class="intro-art" aria-hidden="true">
+            <canvas id="introArt" width="200" height="200"></canvas>
+          </div>
+          <h1>သနပ်ခါး လိမ်းကြမယ်</h1>
+          <p>Put on thanakha the way you did at home. Pick a shape, then take a selfie to send to family.</p>
+          <button id="btnCamera" class="btn primary">Open camera</button>
+          <label class="btn ghost">
+            Use a photo
+            <input id="filePhoto" type="file" accept="image/*" hidden />
+          </label>
+          <p class="fine">Your camera stays on your phone. Nothing is uploaded.</p>
+        </div>
+      </div>
+
+      <div class="toast" id="toast" hidden></div>
+    </section>
+
+    <section class="panel" id="panel">
+      <div class="row shapes" id="shapes" role="radiogroup" aria-label="Thanakha shape"></div>
+
+      <div class="row controls">
+        <div class="group" role="group" aria-label="Extras">
+          <button class="pill" data-extra="forehead" aria-pressed="false">နဖူး <small>Forehead</small></button>
+          <button class="pill" data-extra="nose" aria-pressed="false">နှာခေါင်း <small>Nose</small></button>
+          <button class="pill" data-extra="chin" aria-pressed="false">မေးစေ့ <small>Chin</small></button>
+        </div>
+      </div>
+
+      <div class="row controls">
+        <div class="group tones" id="tones" role="radiogroup" aria-label="Thanakha tone"></div>
+        <label class="strength">
+          <span>Strength</span>
+          <input id="strength" type="range" min="0.3" max="1" step="0.05" value="0.85" />
+        </label>
+      </div>
+
+      <div class="row shutter-row">
+        <button id="btnShutter" class="shutter" aria-label="Take photo" disabled><span></span></button>
+      </div>
+    </section>
+  </main>
+
+  <div class="sheet" id="result" hidden>
+    <div class="sheet-card">
+      <img id="resultImg" alt="Your thanakha selfie" />
+      <div class="sheet-actions">
+        <button id="btnShare" class="btn primary">Share</button>
+        <a id="btnSave" class="btn ghost" download="thanakha-selfie.jpg">Save</a>
+        <button id="btnBack" class="btn ghost">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
