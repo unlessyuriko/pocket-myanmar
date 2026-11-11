@@ -3,6 +3,33 @@
 // and, far behind it, Shwedagon and an arcade wall. Plus the small things you offer
 // (water, lamps, flowers, a bell).
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+
+// Real 3D models (made from reference images, compressed) for the pieces that are in models/.
+// Any that fail to load keep the simple shape built in code.
+const gltf = new GLTFLoader();
+gltf.setMeshoptDecoder(MeshoptDecoder);
+const modelCache = new Map();
+const MODELS = new Map([["mon", 1.45], ["fri", 1.5]]);       // birth-day id -> height in corner units
+export function loadModel(name, height) {
+  if (!modelCache.has(name)) {
+    modelCache.set(name, gltf.loadAsync(`models/${name}.glb`).then((g) => {
+      const o = g.scene;
+      const box = new THREE.Box3().setFromObject(o);
+      const size = box.getSize(new THREE.Vector3());
+      o.scale.setScalar(height / size.y);
+      box.setFromObject(o);
+      const c = box.getCenter(new THREE.Vector3());
+      o.position.set(-c.x, -box.min.y, -c.z);
+      o.traverse((n) => { if (n.isMesh && n.material) { n.material.envMapIntensity = 1.2; if (n.material.metalness != null) n.material.metalness = Math.max(n.material.metalness, 0.7); } });
+      const wrap = new THREE.Group();
+      wrap.add(o);
+      return wrap;
+    }));
+  }
+  return modelCache.get(name).then((w) => w.clone(true));
+}
 
 // The eight birth-day posts. Wednesday is split into morning and afternoon (Rahu), as in Myanmar.
 export const DAYS = [
@@ -459,6 +486,11 @@ export function buildCorner(m, day, font) {
   core.position.z = -0.45;
   for (const o of [...g.children]) if (o !== slab && o !== basin && o !== inner) core.add(o);
   g.add(core);
+  loadModel("buddha", 1.5).then((o) => {            // the real Buddha on its lotus base replaces the simple one
+    o.position.set(0, TABLE_Y + 0.04, 0);
+    core.add(o);
+    bowl.visible = false; buddha.visible = false;
+  }).catch(() => {});
 
   g.userData = {
     day, plate, buddha, flames, light, cup, bell: pivot, flowers: [], animal: null,
@@ -477,6 +509,15 @@ export function setCornerDay(corner, day, m, font = corner.userData.font) {
   ud.animal.scale.multiplyScalar(0.85);
   ud.animal.position.set(0, 0.02, 1.0);
   corner.add(ud.animal);
+  if (MODELS.has(day.id)) {                       // swap in the real model once it has loaded
+    loadModel(day.id, MODELS.get(day.id)).then((o) => {
+      if (ud.day !== day) return;
+      corner.remove(ud.animal);
+      ud.animal = o;
+      o.position.set(0, 0.02, 1.0);
+      corner.add(o);
+    }).catch(() => {});
+  }
   ud.plate.material.map.dispose();
   ud.plate.material.map = plaqueTexture(day, font);
   ud.plate.material.needsUpdate = true;
