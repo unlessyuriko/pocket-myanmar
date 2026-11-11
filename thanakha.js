@@ -2,6 +2,8 @@
 // Each shape is drawn in a small "face-local" space so it turns, tilts and
 // shrinks with the head: u points outward (away from the nose), v points down.
 
+import { texPoints } from "./facemap.js";
+
 export const SHAPES = [
   { id: "circle",  mm: "အဝိုင်း" },
   { id: "square",  mm: "လေးထောင့်" },
@@ -333,6 +335,12 @@ export function drawThanakha(ctx, faces, opts) {
   }
 }
 
+// Paint the shapes on the flat, unwrapped face picture (used as the 3D mesh's texture).
+// Same drawing code as for a photo, just on the face laid out frontal.
+export function drawFaceTexture(canvas, opts) {
+  drawFace(canvas.getContext("2d"), texPoints(canvas.width), { ...opts, uv: true, now: undefined, restart: 0 });
+}
+
 function drawFace(ctx, P, opts) {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -341,7 +349,10 @@ function drawFace(ctx, P, opts) {
 
   const pattern = getPattern(ctx, opts.tone);
   const faceW = dist(P[234], P[454]);
-  const down = mul(sub(P[152], P[10]), 0.2);          // face-down axis
+  // face-down axis. On the flat face map, "down" is as long as one shape unit sideways,
+  // so shapes keep their proportions there (the map's own height is not to scale)
+  const dv = sub(P[152], P[10]);
+  const down = opts.uv ? mul(dv, (0.25 * faceW) / (Math.hypot(dv.x, dv.y) || 1)) : mul(dv, 0.2);
   const across = mul(sub(P[454], P[234]), 0.25);       // face-across axis
   const noseMid = P[195];
 

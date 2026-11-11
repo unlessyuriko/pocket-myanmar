@@ -1,5 +1,7 @@
 import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
-import { SHAPES, TONES, REVEAL_MS, drawThanakha, drawShapeIcon } from "./thanakha.js";
+import { SHAPES, TONES, REVEAL_MS, drawThanakha, drawFaceTexture, drawShapeIcon } from "./thanakha.js";
+import { createMeshRenderer } from "./mesh.js";
+import { TEX_SIZE } from "./facemap.js";
 import { createFx, readFace } from "./fx.js";
 import { createBlender } from "./blend.js";
 
@@ -19,6 +21,12 @@ if (!blender && view.getContext("webgl")) {
 const ctx = blender ? null : view.getContext("2d");
 const layer = document.createElement("canvas");
 const lctx = layer.getContext("2d");
+// 3D face mesh (paste wrapped around the head). Add ?mesh=0 to the address to use the flat shapes instead.
+const meshCanvas = document.createElement("canvas");
+const mesh = blender && new URLSearchParams(location.search).get("mesh") !== "0" ? createMeshRenderer(meshCanvas) : null;
+const texCanvas = document.createElement("canvas");
+texCanvas.width = texCanvas.height = TEX_SIZE;
+let texKey = "";
 const shade = document.createElement("canvas");
 const sctx = shade.getContext("2d");
 const stage = $("#stage");
@@ -231,8 +239,8 @@ function smooth(next, prev) {
 // ---------- rendering ----------
 function sizeCanvases(w, h) {
   if (view.width !== w || view.height !== h) {
-    view.width = layer.width = fxCanvas.width = w;
-    view.height = layer.height = fxCanvas.height = h;
+    view.width = layer.width = fxCanvas.width = meshCanvas.width = w;
+    view.height = layer.height = fxCanvas.height = meshCanvas.height = h;
   }
 }
 
@@ -268,9 +276,17 @@ function compose(source, mirror) {
   const W = view.width, H = view.height;
   state.now = performance.now();
   if (blender) {
-    drawThanakha(lctx, state.faces, state);
+    let paste = layer;
+    if (mesh) {
+      // repaint the flat face picture only when the look changes
+      const key = state.shape + "|" + state.tone + "|" + Object.values(state.extras).join();
+      if (key !== texKey) { texKey = key; drawFaceTexture(texCanvas, state); mesh.setTexture(texCanvas); }
+      paste = mesh.render(state.faces, state);
+    } else {
+      drawThanakha(lctx, state.faces, state);
+    }
     measureFace(source, mirror);
-    blender.render(source, layer, { mirror, strength: state.points ? state.strength : 0, faceLum });
+    blender.render(source, paste, { mirror, strength: state.points ? state.strength : 0, faceLum });
     return;
   }
   ctx.save();
@@ -776,4 +792,4 @@ if (!(navigator.connection && navigator.connection.saveData)) {
 
 // Testing helper: ?img=<url> opens a photo straight away
 const testImg = new URLSearchParams(location.search).get("img");
-if (testImg) { window.__thanakha = { state, layer, readFace, fx }; startPhoto(testImg); }
+if (testImg) { window.__thanakha = { state, layer, readFace, fx, mesh, texCanvas }; startPhoto(testImg); }
