@@ -176,7 +176,8 @@ async function getLandmarker(mode) {
 const TRACKER_ERROR = "မျက်နှာရှာစနစ် မရရှိပါ။ အင်တာနက်စစ်ပြီး ထပ်ကြိုးစားပါ။";
 
 function toPixels(lms, w, h, mirror) {
-  return lms.map(l => ({ x: (mirror ? 1 - l.x : l.x) * w, y: l.y * h }));
+  // z is depth (same scale as x), kept so the filter can tell when the head is turned
+  return lms.map(l => ({ x: (mirror ? 1 - l.x : l.x) * w, y: l.y * h, z: (l.z || 0) * w }));
 }
 
 // Smooth out jitter; follow fast moves quickly, steady when still
@@ -186,7 +187,11 @@ function smooth(next) {
   const faceW = Math.hypot(next[234].x - next[454].x, next[234].y - next[454].y) || 1;
   const move = Math.hypot(next[1].x - prev[1].x, next[1].y - prev[1].y) / faceW;
   const a = Math.min(1, 0.35 + move * 8);
-  return next.map((p, i) => ({ x: prev[i].x + (p.x - prev[i].x) * a, y: prev[i].y + (p.y - prev[i].y) * a }));
+  return next.map((p, i) => ({
+    x: prev[i].x + (p.x - prev[i].x) * a,
+    y: prev[i].y + (p.y - prev[i].y) * a,
+    z: prev[i].z + (p.z - prev[i].z) * a,
+  }));
 }
 
 // ---------- rendering ----------

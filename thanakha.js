@@ -120,6 +120,51 @@ function polygon(ctx, P, idx, scale = 1, center = null) {
   ctx.closePath();
 }
 
+// ---------- head turn ----------
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const smoothstep = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+// Real (3D) width of the face between the two cheek edges; stays steady as the head turns
+function faceW3(P) {
+  const a = P[234], b = P[454];
+  return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0)) || 1;
+}
+
+// How a cheek faces the camera. A cheek's surface points ~55 degrees outward from the
+// nose; turning the head toward that side swings it to face the lens, turning away hides it.
+//   vis:  0 (hidden) to 1 (fully visible)
+//   fore: how squeezed the cheek looks sideways (1 = face-on)
+const CHEEK_ANGLE = 0.96;
+function cheekPose(P, edge, other) {
+  const e = P[edge], o = P[other];
+  const len = Math.hypot(e.x - o.x, e.y - o.y, (e.z || 0) - (o.z || 0)) || 1;
+  const turn = Math.asin(clamp(((o.z || 0) - (e.z || 0)) / len, -1, 1));   // + = this side nearer the camera
+  const facing = Math.cos(CHEEK_ANGLE - turn);
+  return {
+    vis: smoothstep(0.04, 0.3, facing),
+    fore: clamp(facing / Math.cos(CHEEK_ANGLE), 0.2, 1.4),
+  };
+}
+
+// Draw something at a given opacity, keeping its internal cut-outs (scrapes, torn edges) crisp
+let scratch = null;
+function withLayer(ctx, alpha, draw) {
+  if (alpha >= 0.98) { ctx.save(); draw(ctx); ctx.restore(); return; }
+  if (!scratch) scratch = document.createElement("canvas");
+  if (scratch.width !== ctx.canvas.width || scratch.height !== ctx.canvas.height) {
+    scratch.width = ctx.canvas.width; scratch.height = ctx.canvas.height;
+  }
+  const g = scratch.getContext("2d");
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, scratch.width, scratch.height);
+  g.save(); draw(g); g.restore();
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(scratch, 0, 0);
+  ctx.restore();
+}
+
 // Put the canvas into a face-local space: origin O, axes U (outward) and V (down)
 function frame(ctx, O, U, V) {
   ctx.setTransform(U.x, U.y, V.x, V.y, O.x, O.y);
@@ -261,7 +306,7 @@ export function drawThanakha(ctx, P, opts) {
 
   if (opts.shape === "full") {
     ctx.beginPath();
-    polygon(ctx, P, FACE_OVAL, 0.93, noseMid);
+    polygon(ctx, P, FACE_OVAL, 0.95);
     ctx.globalAlpha = 0.82;   // full-face wash is usually a thinner layer
     ctx.fillStyle = pattern;
     if (pattern.setTransform) pattern.setTransform(new DOMMatrix([faceW / 600, 0, 0, faceW / 600, 0, 0]));
@@ -277,14 +322,20 @@ export function drawThanakha(ctx, P, opts) {
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
   } else if (opts.shape !== "none") {
-    for (const [cheek, edge] of [[50, 234], [280, 454]]) {
-      const U = mul(sub(P[edge], noseMid), 0.5);
+    for (const [cheek, edge, other] of [[50, 234, 454], [280, 454, 234]]) {
+      const { vis, fore } = cheekPose(P, edge, other);
+      if (vis < 0.02) continue;                       // cheek is turned away from the camera
+      // Outward direction across the face in the image (follows head roll), sized by the
+      // real cheek-to-cheek width and squeezed by how side-on this cheek is
+      const dir = sub(P[edge], P[other]);
+      const len = Math.hypot(dir.x, dir.y) || 1;
+      const U = mul(dir, (0.25 * faceW3(P) * fore) / len);
       const O = add(lerp(P[cheek], P[edge], 0.12), mul(down, 0.25));
-      ctx.save();
-      frame(ctx, O, U, down);
-      ctx.scale(0.88, 0.88);
-      cheekShape(ctx, opts.shape, pattern);
-      ctx.restore();
+      withLayer(ctx, vis, g => {
+        frame(g, O, U, down);
+        g.scale(0.88, 0.88);
+        cheekShape(g, opts.shape, pattern);
+      });
     }
   }
 
@@ -316,7 +367,7 @@ export function drawThanakha(ctx, P, opts) {
   ctx.globalCompositeOperation = "destination-in";
   ctx.fillStyle = "#000";
   ctx.beginPath();
-  polygon(ctx, P, FACE_OVAL, 0.96, noseMid);
+  polygon(ctx, P, FACE_OVAL, 0.97);
   ctx.fill();
 
   ctx.restore();
