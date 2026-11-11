@@ -1,6 +1,10 @@
-# Thanakha Selfie (သနပ်ခါး)
+# Pocket Myanmar
 
-A web AR face filter that paints Myanmar thanakha on your face through the phone camera. No app install needed.
+Myanmar in your pocket: small AR experiences for people who miss home, running in the phone's browser with no install.
+
+## Feature 1: Thanakha (သနပ်ခါး)
+
+A face filter that paints Myanmar thanakha on your face through the phone camera.
 
 - **Shapes:** Round, Square, Bodhi leaf, Comb lines, Heart, Flower, Full face
 - **Extras:** forehead, nose and chin dots, which can be combined with any shape

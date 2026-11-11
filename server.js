@@ -20,4 +20,4 @@ http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": types[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-store" });
     res.end(data);
   });
-}).listen(port, () => console.log(`Thanakha Selfie running at http://localhost:${port}`));
+}).listen(port, () => console.log(`Pocket Myanmar running at http://localhost:${port}`));

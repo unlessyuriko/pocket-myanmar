@@ -51,7 +51,7 @@ function buildShapePicker() {
     c.width = c.height = 116;
     drawShapeIcon(c, s.id, state.tone);
     b.append(c);
-    b.insertAdjacentHTML("beforeend", `<span class="mm">${s.mm}</span><span class="en">${s.en}</span>`);
+    b.insertAdjacentHTML("beforeend", `<span class="mm">${s.mm}</span>`);
     b.onclick = () => {
       state.shape = s.id;
       wrap.querySelectorAll(".shape").forEach(x => x.setAttribute("aria-checked", String(x === b)));
@@ -102,13 +102,10 @@ function toast(msg, ms = 0) {
   if (ms) toastTimer = setTimeout(() => (t.hidden = true), ms);
 }
 
-// Intro artwork: a face-ish icon with round thanakha
-drawShapeIcon($("#introArt"), "circle", "fresh");
-
 // ---------- face tracking ----------
 async function getLandmarker(mode) {
   if (!landmarker) {
-    toast("Loading face tracker…");
+    toast("မျက်နှာရှာစနစ် ပြင်ဆင်နေပါတယ်…");
     const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
     const opts = (delegate) => ({
       baseOptions: { modelAssetPath: MODEL_URL, delegate },
@@ -238,7 +235,7 @@ function cameraLoop() {
       missed = 0;
     } else if (++missed > 10) {
       state.points = null;
-      toast("Can't see your face — move into the light");
+      toast("မျက်နှာ မမြင်ရပါ၊ အလင်းရောင်ရှိတဲ့နေရာ ရွှေ့ပါ");
     }
     compose(video, true);
   }
@@ -255,8 +252,8 @@ async function startCamera() {
     });
   } catch (err) {
     toast(location.protocol === "https:" || location.hostname === "localhost"
-      ? "Camera blocked — allow camera access and try again"
-      : "Camera needs a secure (https) link", 5000);
+      ? "ကင်မရာကို ပိတ်ထားပါတယ်။ ခွင့်ပြုပြီး ထပ်ကြိုးစားပါ။"
+      : "ကင်မရာသုံးဖို့ လုံခြုံတဲ့လင့်ခ် လိုပါတယ်။", 5000);
     return;
   }
   video.srcObject = stream;
@@ -280,7 +277,7 @@ async function startPhoto(src) {
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = src;
-  try { await img.decode(); } catch { toast("Couldn't open that photo", 4000); return; }
+  try { await img.decode(); } catch { toast("ဓာတ်ပုံကို ဖွင့်မရပါ", 4000); return; }
 
   // Keep it a sensible size for phones
   const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
@@ -299,7 +296,7 @@ async function startPhoto(src) {
   const res = lm.detect(sized);
   const lms = res.faceLandmarks && res.faceLandmarks[0];
   state.points = lms ? toPixels(lms, view.width, view.height, false) : null;
-  if (!lms) toast("No face found in this photo", 4000);
+  if (!lms) toast("ဒီဓာတ်ပုံထဲမှာ မျက်နှာ မတွေ့ပါ", 4000);
   redraw();
 }
 
@@ -336,7 +333,7 @@ $("#btnShutter").onclick = () => {
   // Small caption in the corner
   const fs = Math.round(out.width * 0.032);
   o.font = `600 ${fs}px "Noto Sans Myanmar", "Myanmar Text", sans-serif`;
-  const text = "သနပ်ခါး · Thanakha Selfie";
+  const text = "Pocket Myanmar · သနပ်ခါး";
   const pad = fs * 0.6;
   const tw = o.measureText(text).width;
   o.fillStyle = "rgba(27,20,16,0.55)";
@@ -362,9 +359,9 @@ $("#btnShutter").onclick = () => {
 $("#btnBack").onclick = () => { $("#result").hidden = true; };
 $("#btnShare").onclick = async () => {
   if (!lastBlob) return;
-  const file = new File([lastBlob], "thanakha-selfie.jpg", { type: "image/jpeg" });
+  const file = new File([lastBlob], "pocket-myanmar-thanakha.jpg", { type: "image/jpeg" });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: "Thanakha Selfie", text: "သနပ်ခါး လိမ်းထားတယ် 🌼" }); } catch {}
+    try { await navigator.share({ files: [file], title: "Pocket Myanmar", text: "သနပ်ခါး လိမ်းထားတယ် 🌼" }); } catch {}
   } else {
     $("#btnSave").click();
   }

@@ -3,20 +3,20 @@
 // shrinks with the head: u points outward (away from the nose), v points down.
 
 export const SHAPES = [
-  { id: "circle",  mm: "အဝိုင်း",       en: "Round" },
-  { id: "square",  mm: "လေးထောင့်",     en: "Square" },
-  { id: "leaf",    mm: "ညောင်ရွက်",     en: "Bodhi leaf" },
-  { id: "stripes", mm: "မျဉ်းကြောင်း",   en: "Comb lines" },
-  { id: "heart",   mm: "နှလုံး",         en: "Heart" },
-  { id: "flower",  mm: "ပန်း",           en: "Flower" },
-  { id: "full",    mm: "တစ်မျက်နှာလုံး", en: "Full face" },
-  { id: "none",    mm: "မလိမ်း",         en: "None" },
+  { id: "circle",  mm: "အဝိုင်း" },
+  { id: "square",  mm: "လေးထောင့်" },
+  { id: "leaf",    mm: "ညောင်ရွက်" },
+  { id: "stripes", mm: "မျဉ်းကြောင်း" },
+  { id: "heart",   mm: "နှလုံး" },
+  { id: "flower",  mm: "ပန်း" },
+  { id: "full",    mm: "မျက်နှာအပြည့်" },
+  { id: "none",    mm: "မလိမ်း" },
 ];
 
 export const TONES = [
-  { id: "fresh",   label: "Fresh paste", base: [232, 212, 158] },
-  { id: "classic", label: "Classic",     base: [238, 226, 192] },
-  { id: "dry",     label: "Dried",       base: [244, 239, 226] },
+  { id: "fresh",   label: "လတ်ဆတ်",   base: [232, 212, 158] },
+  { id: "classic", label: "ရိုးရိုး",     base: [238, 226, 192] },
+  { id: "dry",     label: "ခြောက်သွေ့", base: [244, 239, 226] },
 ];
 
 // Landmark indices
@@ -335,25 +335,28 @@ export function drawShapeIcon(canvas, shapeId, toneId) {
   ctx.fillStyle = grd;
   ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2); ctx.fill();
 
-  const pattern = getPattern(ctx, toneId);
-  ctx.save();
+  // Draw the paste on its own layer (its erase effects must not cut into the skin disc)
+  const layer = document.createElement("canvas");
+  layer.width = layer.height = S;
+  const lc = layer.getContext("2d");
+  const pattern = getPattern(lc, toneId);
   if (shapeId === "full") {
-    ctx.translate(S / 2, S / 2);
-    ctx.beginPath(); ctx.ellipse(0, S * 0.04, S * 0.3, S * 0.38, 0, 0, Math.PI * 2);
-    ctx.fillStyle = pattern; ctx.fill();
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.beginPath();
-    ctx.ellipse(-S * 0.12, -S * 0.06, S * 0.07, S * 0.04, 0, 0, Math.PI * 2);
-    ctx.ellipse(S * 0.12, -S * 0.06, S * 0.07, S * 0.04, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath(); ctx.ellipse(0, S * 0.2, S * 0.09, S * 0.035, 0, 0, Math.PI * 2); ctx.fill();
+    lc.translate(S / 2, S / 2);
+    lc.beginPath(); lc.ellipse(0, S * 0.04, S * 0.3, S * 0.38, 0, 0, Math.PI * 2);
+    lc.fillStyle = pattern; lc.fill();
+    lc.globalCompositeOperation = "destination-out";
+    lc.beginPath();
+    lc.ellipse(-S * 0.12, -S * 0.06, S * 0.07, S * 0.04, 0, 0, Math.PI * 2);
+    lc.ellipse(S * 0.12, -S * 0.06, S * 0.07, S * 0.04, 0, 0, Math.PI * 2);
+    lc.fill();
+    lc.beginPath(); lc.ellipse(0, S * 0.2, S * 0.09, S * 0.035, 0, 0, Math.PI * 2); lc.fill();
   } else if (shapeId === "none") {
-    ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = S * 0.05; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(S * 0.3, S * 0.3); ctx.lineTo(S * 0.7, S * 0.7); ctx.stroke();
+    lc.strokeStyle = "rgba(255,255,255,.7)"; lc.lineWidth = S * 0.05; lc.lineCap = "round";
+    lc.beginPath(); lc.moveTo(S * 0.3, S * 0.3); lc.lineTo(S * 0.7, S * 0.7); lc.stroke();
   } else {
     const k = S * 0.36;
-    ctx.setTransform(k, 0, 0, k, S / 2, S / 2);
-    cheekShape(ctx, shapeId, pattern);
+    lc.setTransform(k, 0, 0, k, S / 2, S / 2);
+    cheekShape(lc, shapeId, pattern);
   }
-  ctx.restore();
+  ctx.drawImage(layer, 0, 0);
 }
