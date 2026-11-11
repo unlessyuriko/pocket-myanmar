@@ -18,6 +18,8 @@ const FRAG = `
 precision mediump float;
 uniform sampler2D uSkin;
 uniform sampler2D uPaste;
+uniform sampler2D uOcc;     // alpha = hair (or anything else) that sits in front of the paste
+uniform float uUseOcc;
 uniform float uMirror;
 uniform float uStrength;
 uniform float uFaceLum;     // average skin brightness on the face (0..1)
@@ -34,6 +36,12 @@ void main() {
   vec3 skin = skinAt(vUv);
   vec4 p = texture2D(uPaste, vUv);
   if (p.a < 0.002) { gl_FragColor = vec4(skin, 1.0); return; }
+  if (uUseOcc > 0.5) {
+    // hair in front: the paste fades out under it (the mask is in camera orientation, like the skin)
+    float hair = texture2D(uOcc, vec2(uMirror > 0.5 ? 1.0 - vUv.x : vUv.x, vUv.y)).a;
+    p.a *= 1.0 - smoothstep(0.25, 0.75, hair);
+    if (p.a < 0.002) { gl_FragColor = vec4(skin, 1.0); return; }
+  }
 
   // Broad shading (soft) + fine pore detail (sharp), both relative to the face average
   vec2 d = uTexel * 3.0;
@@ -101,16 +109,19 @@ export function createBlender(canvas) {
     };
     const skinTex = makeTex(0);
     const pasteTex = makeTex(1);
+    const occTex = makeTex(2);
     gl.uniform1i(gl.getUniformLocation(prog, "uSkin"), 0);
     gl.uniform1i(gl.getUniformLocation(prog, "uPaste"), 1);
+    gl.uniform1i(gl.getUniformLocation(prog, "uOcc"), 2);
     const U = (n) => gl.getUniformLocation(prog, n);
+    const uUseOcc = U("uUseOcc");
     const uMirror = U("uMirror"), uStrength = U("uStrength"), uFaceLum = U("uFaceLum"), uTexel = U("uTexel");
 
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 
     return {
-      render(source, pasteCanvas, { mirror, strength, faceLum }) {
+      render(source, pasteCanvas, { mirror, strength, faceLum, occluder }) {
         const W = canvas.width, H = canvas.height;
         gl.viewport(0, 0, W, H);
         gl.activeTexture(gl.TEXTURE0);
@@ -119,6 +130,13 @@ export function createBlender(canvas) {
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, pasteTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pasteCanvas);
+        if (occluder) {
+          gl.activeTexture(gl.TEXTURE2);
+          gl.bindTexture(gl.TEXTURE_2D, occTex);
+          // small canvas, so uploading it every frame is cheap
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, occluder);
+        }
+        gl.uniform1f(uUseOcc, occluder ? 1 : 0);
         gl.uniform1f(uMirror, mirror ? 1 : 0);
         gl.uniform1f(uStrength, strength);
         gl.uniform1f(uFaceLum, faceLum);

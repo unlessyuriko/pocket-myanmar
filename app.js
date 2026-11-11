@@ -4,6 +4,7 @@ import { createMeshRenderer } from "./mesh.js";
 import { TEX_SIZE } from "./facemap.js";
 import { createFx, readFace } from "./fx.js";
 import { createBlender } from "./blend.js";
+import { createOccluder } from "./occlude.js";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
@@ -29,6 +30,7 @@ texCanvas.width = texCanvas.height = TEX_SIZE;
 let texKey = "";
 const shade = document.createElement("canvas");
 const sctx = shade.getContext("2d");
+const occ = createOccluder("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");   // hair in front of the paste
 const stage = $("#stage");
 const fxCanvas = $("#fx");
 const fx = createFx(fxCanvas);
@@ -299,7 +301,7 @@ function compose(source, mirror) {
       drawThanakha(lctx, state.faces, state);
     }
     measureFace(source, mirror);
-    blender.render(source, paste, { mirror, strength: state.points ? state.strength : 0, faceLum });
+    blender.render(source, paste, { mirror, strength: state.points ? state.strength : 0, faceLum, occluder: state.points ? occ.mask : null });
     return;
   }
   ctx.save();
@@ -435,7 +437,25 @@ function celebrate() {
   if (state.mode === "photo") animate();
 }
 
-let missed = 0;
+let missed = 0, frameNo = 0, occBusy = false;
+
+// Points that are certainly not hair (nose tip, cheek middles), as 0..1 positions in the camera picture
+// and, per face, the forehead and temple area where hair may cover the paste (above the eye line)
+function probesFor(faces, mirror) {
+  const W = view.width, H = view.height;
+  const nx = (p) => [mirror ? 1 - p.x / W : p.x / W, p.y / H];
+  const probes = [], zones = [];
+  for (const P of faces) {
+    for (const i of [1, 50, 280]) probes.push(nx(P[i]));
+    const a = P[127], b = P[356];
+    const wx = (b.x - a.x) * 0.35, wy = (b.y - a.y) * 0.35;
+    const ux = P[10].x - P[152].x, uy = P[10].y - P[152].y;
+    const q = [{ x: a.x - wx, y: a.y - wy }, { x: b.x + wx, y: b.y + wy }];
+    zones.push([q[0], q[1], { x: q[1].x + ux * 1.1, y: q[1].y + uy * 1.1 }, { x: q[0].x + ux * 1.1, y: q[0].y + uy * 1.1 }].map(nx));
+  }
+  return { probes, zones };
+}
+
 function cameraLoop() {
   if (state.mode !== "camera") { loopRunning = false; return; }
   if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
@@ -447,7 +467,13 @@ function cameraLoop() {
       setFaces(smoothFaces(found));
       if (missed > 10) toast("");
       missed = 0;
+      // find hair a few times a second (it changes slowly next to the face itself)
+      if (occ.ready && !occBusy && frameNo++ % 3 === 0) {
+        occBusy = true;
+        occ.video(video, probesFor(state.faces, state.mirror)).finally(() => { occBusy = false; });
+      }
     } else if (++missed > 10) {
+      occ.clear();
       setFaces([]);
       toast("မျက်နှာ မမြင်ရပါ၊ အလင်းရောင်ရှိတဲ့နေရာ ရွှေ့ပါ");
     }
@@ -496,6 +522,7 @@ async function startCamera(facing = "user") {
   const before = state.facing;
   toast("");
   stopCamera();
+  occ.clear();
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     toast(cameraErrorMessage());
     return;
@@ -577,8 +604,13 @@ async function startPhoto(src) {
   const found = (res.faceLandmarks || []).map((l) => toPixels(l, view.width, view.height, false));
   setFaces(found);
   if (!found.length) toast("ဒီဓာတ်ပုံထဲမှာ မျက်နှာ မတွေ့ပါ", 4000);
+  occ.clear();
   redraw();
   animate();
+  if (found.length && blender) {
+    // keep the paste under hair; repaint when the hair model answers (it downloads on first use)
+    occ.image(sized, probesFor(state.faces, false)).then((ok) => { if (ok && state.photo === sized) { redraw(); } }).catch(() => {});
+  }
 }
 
 function enterApp() {
@@ -798,11 +830,11 @@ enableRadioKeys($("#tones"));
 
 // Start fetching the face tracker right away (skipped when the phone asks to save data)
 if (!(navigator.connection && navigator.connection.saveData)) {
-  const warm = () => ensureLandmarker().catch(() => {});
+  const warm = () => ensureLandmarker().then(() => blender && occ.load()).catch(() => {});
   if ("requestIdleCallback" in window) requestIdleCallback(warm, { timeout: 4000 });
   else setTimeout(warm, 2000);
 }
 
 // Testing helper: ?img=<url> opens a photo straight away
 const testImg = new URLSearchParams(location.search).get("img");
-if (testImg) { window.__thanakha = { state, layer, readFace, fx, mesh, texCanvas }; startPhoto(testImg); }
+if (testImg) { window.__thanakha = { state, layer, readFace, fx, mesh, texCanvas, occ }; startPhoto(testImg); }

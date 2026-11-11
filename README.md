@@ -38,6 +38,7 @@ Phones only allow camera access on **https** links. Host the folder on any stati
 - `thanakha.js`: thanakha shapes, paste texture and how they're placed on the face
 - `fx.js`: sparkles and petals, and smile / wink / open-mouth detection
 - `mesh.js`, `facemesh.js`, `facemap.js`: the paste is painted once on a flat picture of the face and wrapped onto a 3D face mesh (MediaPipe's canonical face model, Apache 2.0) fitted to each tracked face every frame, the way phone face filters work. Add `?mesh=0` to the address to use the older flat drawing instead.
+- `occlude.js`: finds hair with MediaPipe's small hair model (under 1 MB, loaded in the background) so a fringe or loose strands over the forehead and temples stay in front of the paste. Only the area above the eye line is used, because the model mistakes shadowed jaw and ear skin for hair.
 - `blend.js`: WebGL shader that blends the paste into the skin using its light and shadow
 - `logo.svg`: logo, also used as the browser tab icon
 
