@@ -3,7 +3,7 @@
 // turn the 3D camera as you turn the phone, so the pagoda stays where you put it.
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { DAYS, makeMaterials, buildStupa, buildShrine, addFlowers, glowTexture } from "./pagoda-model.js";
+import { DAYS, makeMaterials, buildCorner, setCornerDay, buildBackdrop, TABLE_Y, addFlowers, glowTexture } from "./pagoda-model.js";
 
 const $ = (s) => document.querySelector(s);
 const app = $("#app"), stage = $("#stage"), video = $("#video"), glCanvas = $("#gl");
@@ -11,16 +11,16 @@ const FONT = '"Noto Sans Myanmar","Myanmar Text","Padauk",sans-serif';
 const MM = "၀၁၂၃၄၅၆၇၈၉";
 const mm = (n) => String(n).replace(/\d/g, (d) => MM[d]);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const TABLE_DROP = 0.45;       // metres the table is assumed to be below the phone
-const SHRINE_R = 2.35;         // distance of the shrines from the middle (pagoda units)
+const TABLE_DROP = 0.45;       // without surface detection (iPhone): metres the table is assumed to be below the phone
 
 const S = {
   phase: "intro",              // intro -> place -> worship
   dayIdx: null,
   placed: false,
   gyro: false,
+  xr: false,                   // true while the phone's own AR (WebXR) tracks the surface
   hasCam: false,
-  scale: 0.1,
+  scale: 0.12,
   done: { water: false, lamp: false, flower: false, bell: false },
   sadhuShown: false,
   yaw: 0, pitch: -0.5,         // look direction when there are no motion sensors (desktop)
@@ -80,55 +80,52 @@ const sun = new THREE.DirectionalLight(0xffffff, 2.2);
 sun.position.set(2, 4, 3);
 scene.add(hemi, sun);
 
-const world = new THREE.Group();     // placed on the table
+const world = new THREE.Group();     // sits on the table: its origin is the middle of the corner's floor
 world.visible = false;
 scene.add(world);
-const pagoda = new THREE.Group();    // turns so the chosen shrine faces you
+const pagoda = new THREE.Group();    // the corner and its backdrop; turns to face you
 world.add(pagoda);
 
 const mats = makeMaterials();
-const stupa = buildStupa(mats);
-pagoda.add(stupa);
-const shrines = [];
-let jewelGlow = null;
+const backdrop = buildBackdrop(mats);
+pagoda.add(backdrop);
+const stupa = backdrop.userData.stupa;
+let corner = null;
 
-// soft shadow under the platform
+// soft shadow under the corner
 {
   const c = document.createElement("canvas"); c.width = c.height = 128;
   const x = c.getContext("2d");
   const g = x.createRadialGradient(64, 64, 20, 64, 64, 62);
   g.addColorStop(0, "rgba(0,0,0,0.5)"); g.addColorStop(0.7, "rgba(0,0,0,0.25)"); g.addColorStop(1, "rgba(0,0,0,0)");
   x.fillStyle = g; x.fillRect(0, 0, 128, 128);
-  const sh = new THREE.Mesh(new THREE.PlaneGeometry(9, 9), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
-  sh.rotation.x = -Math.PI / 2; sh.position.y = -0.01;
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(7, 7), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+  sh.rotation.x = -Math.PI / 2; sh.position.set(0, -0.125, -0.4);
   world.add(sh);
 }
-// glow behind the jewel at the top, strong at night
-jewelGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.35 }));
+// glow behind the jewel at the top of Shwedagon, strong at night
+const jewelGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.35 }));
 jewelGlow.scale.setScalar(1.1);
 jewelGlow.position.copy(stupa.userData.jewel.position);
-pagoda.add(jewelGlow);
+stupa.add(jewelGlow);
 
-// ring that marks your shrine
-const ring = new THREE.Mesh(new THREE.RingGeometry(0.36, 0.46, 40),
-  new THREE.MeshBasicMaterial({ color: 0xf7de9a, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
-ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.09, 0.05);
-let lamps = 0;
+// the ring that shows where it will land on a real surface (phone AR)
+const reticle = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.13, 48),
+  new THREE.MeshBasicMaterial({ color: 0xf7de9a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+reticle.rotation.x = -Math.PI / 2;
+const reticleHolder = new THREE.Group();
+reticleHolder.add(reticle);
+reticleHolder.visible = false;
+scene.add(reticleHolder);
 
-async function buildShrines() {
+async function buildTheCorner() {
   try { await document.fonts.load(`700 40px ${FONT}`); await document.fonts.load(`400 30px ${FONT}`); } catch { /* fall back to system font */ }
-  DAYS.forEach((day, i) => {
-    const a = (i / DAYS.length) * Math.PI * 2;
-    const sh = buildShrine(mats, day, FONT);
-    sh.position.set(Math.sin(a) * SHRINE_R, 0.1, Math.cos(a) * SHRINE_R);
-    sh.rotation.y = a;
-    sh.userData.angle = a;
-    pagoda.add(sh);
-    shrines.push(sh);
-  });
+  const i = S.dayIdx != null ? S.dayIdx : savedDay != null && DAYS[savedDay] ? savedDay : 0;
+  corner = buildCorner(mats, DAYS[i], FONT);
+  pagoda.add(corner);
+  corner.add(kettle, drops);
   if (S.dayIdx != null) selectDay(S.dayIdx, true);
 }
-buildShrines();
 
 // the kettle and the water that falls from it
 const kettle = new THREE.Group();
@@ -140,6 +137,7 @@ const kettle = new THREE.Group();
   const handle = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.007, 8, 18, Math.PI), mats.goldDeep);
   handle.position.set(0.045, 0.02, 0); handle.rotation.z = -Math.PI / 2;
   kettle.add(body, spout, handle);
+  kettle.scale.setScalar(3);
   kettle.visible = false;
 }
 const DROPS = 70;
@@ -153,9 +151,10 @@ const dotTex = (() => {
   x.fillStyle = g; x.fillRect(0, 0, 32, 32);
   return new THREE.CanvasTexture(c);
 })();
-const drops = new THREE.Points(dropGeo, new THREE.PointsMaterial({ color: 0xb4defa, size: 0.026, map: dotTex, alphaTest: 0.05, transparent: true, opacity: 0.95, depthWrite: false }));
+const drops = new THREE.Points(dropGeo, new THREE.PointsMaterial({ color: 0xb4defa, size: 0.03, map: dotTex, alphaTest: 0.05, transparent: true, opacity: 0.95, depthWrite: false }));
 drops.frustumCulled = false;
 dropPos.fill(-100);
+buildTheCorner();
 
 let pour = null, swing = null, popping = [];
 
@@ -272,27 +271,27 @@ let changingDay = false;
 function selectDay(i, instant = false) {
   S.dayIdx = i;
   try { localStorage.setItem("mv.day", JSON.stringify(i)); } catch { /* ignore */ }
-  const sh = shrines[i];
-  if (!sh) return;
-  S.shrine = sh;
-  // the active shrine gets its helpers; the others rest
-  sh.add(ring); sh.add(kettle); sh.add(drops);
+  if (!corner) return;                  // built once the fonts are in; it then calls this again
+  S.corner = corner;
+  setCornerDay(corner, DAYS[i], mats, FONT);
+  const ud = corner.userData;
+  ud.flames.forEach((f) => (f.visible = false));
+  ud.lit = false;
+  ud.light.intensity = 0;
+  ud.flowers.forEach((f) => { corner.remove(f); f.geometry.dispose(); f.material.dispose(); });
+  ud.flowers.length = 0;
   kettle.visible = false;
-  lamps = 0;
-  shrines.forEach((o) => { o.userData.light.intensity = 0; });
   S.done = { water: false, lamp: false, flower: false, bell: false };
   S.sadhuShown = false;
   refreshOfferButtons();
   faceYawTarget(instant);
 }
 let rotTarget = 0;
+const viewerPos = new THREE.Vector3();      // where the phone is (phone AR); the origin otherwise
 function faceYawTarget(instant) {
-  const sh = S.shrine;
-  if (!sh) return;
-  // turn the pagoda so the chosen shrine's front points at the camera
+  // turn the corner so its front points at you
   const p = world.position;
-  const toCam = Math.atan2(-p.x, -p.z);
-  rotTarget = toCam - sh.userData.angle;
+  rotTarget = Math.atan2(viewerPos.x - p.x, viewerPos.z - p.z);
   if (instant) pagoda.rotation.y = rotTarget;
 }
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
@@ -306,11 +305,46 @@ function placeAt(cx, cy) {
   let t = 1.1, y = -TABLE_DROP;
   if (d.y < -0.08) t = THREE.MathUtils.clamp(TABLE_DROP / -d.y, 0.45, 2.6);
   world.position.set(d.x * t, y, d.z * t);
+  finishPlace();
+}
+function finishPlace() {
   world.scale.setScalar(S.scale);
   world.visible = true;
   S.placed = true;
   faceYawTarget(true);
   if (S.phase === "place") enterWorship();
+}
+
+// ---------- phone AR (WebXR): find the real surface and stay on it ----------
+// Android Chrome has this. iPhone Safari does not, so there the table is only assumed (see TABLE_DROP).
+let xrSession = null, xrSource = null, xrOK = false, hitReady = false;
+if (navigator.xr && navigator.xr.isSessionSupported) {
+  navigator.xr.isSessionSupported("immersive-ar").then((v) => { xrOK = !!v; }).catch(() => {});
+}
+async function startXR() {
+  try {
+    const session = await navigator.xr.requestSession("immersive-ar", {
+      requiredFeatures: ["hit-test"], optionalFeatures: ["dom-overlay"], domOverlay: { root: app },
+    });
+    renderer.xr.setReferenceSpaceType("local");
+    await renderer.xr.setSession(session);
+    xrSource = await session.requestHitTestSource({ space: await session.requestReferenceSpace("viewer") });
+    xrSession = session;
+    S.xr = true;
+    app.classList.add("xr");
+    session.addEventListener("select", () => { if (S.phase === "place" && hitReady) { world.position.copy(reticleHolder.position); finishPlace(); } });
+    session.addEventListener("end", () => {
+      S.xr = false; xrSession = null; xrSource = null; hitReady = false;
+      app.classList.remove("xr", "started");
+      reticleHolder.visible = false; world.visible = false;
+      S.phase = "intro"; S.placed = false; $("#intro").hidden = false; setHint("");
+    });
+    return true;
+  } catch { return false; }
+}
+for (const sel of ["#panel", "#intro", ".topbar", ".shutter-row", "#toast"]) {
+  const el = document.querySelector(sel);
+  if (el) el.addEventListener("beforexrselect", (e) => e.preventDefault());
 }
 
 function enterWorship() {
@@ -362,18 +396,18 @@ function sadhu() {
   el.hidden = false;
   el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";
   setTimeout(() => (el.hidden = true), 3500);
-  if (shrines.length) for (let i = 0; i < 24; i++) spawnSpark();
+  if (corner) for (let i = 0; i < 24; i++) spawnSpark();
 }
 
 $("#offWater").onclick = () => {
-  if (pour || !S.shrine) return;
+  if (pour || !S.corner) return;
   pour = { t: 0, dur: 2.6, acc: 0 };
   kettle.visible = true;
   Sound.pour();
   offered("water");
 };
 $("#offLamp").onclick = () => {
-  const ud = S.shrine && S.shrine.userData;
+  const ud = S.corner && S.corner.userData;
   if (!ud) return;
   const on = !ud.flames[0].visible;
   ud.flames.forEach((f) => (f.visible = on));
@@ -381,17 +415,17 @@ $("#offLamp").onclick = () => {
   if (on) { Sound.flame(); offered("lamp"); }
 };
 $("#offFlower").onclick = () => {
-  if (!S.shrine) return;
-  const before = S.shrine.userData.flowers.length;
-  addFlowers(S.shrine, 6);
-  const fresh = S.shrine.userData.flowers.slice(before);
+  if (!S.corner) return;
+  const before = S.corner.userData.flowers.length;
+  addFlowers(S.corner, 6);
+  const fresh = S.corner.userData.flowers.slice(before);
   fresh.forEach((f, i) => { f.userData.s = f.scale.clone(); f.scale.setScalar(0.001); popping.push({ f, t: -i * 0.06 }); });
   Sound.petals();
   offered("flower");
 };
 $("#offBell").onclick = () => {
-  if (!S.shrine) return;
-  swing = { t: 0, ud: S.shrine.userData };
+  if (!S.corner) return;
+  swing = { t: 0, ud: S.corner.userData };
   Sound.bell();
   offered("bell");
 };
@@ -402,9 +436,10 @@ const sparkTex = glowTexture();
 function spawnSpark() {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 1 }));
   s.scale.setScalar(0.12 + Math.random() * 0.16);
-  const a = Math.random() * Math.PI * 2, r = 0.2 + Math.random() * 1.6;
-  s.position.set(Math.cos(a) * r, 0.3 + Math.random() * 0.4, Math.sin(a) * r);
-  s.userData = { v: new THREE.Vector3((Math.random() - 0.5) * 0.2, 0.5 + Math.random() * 0.8, (Math.random() - 0.5) * 0.2), life: 0, max: 1.8 + Math.random() };
+  s.scale.multiplyScalar(2.5);
+  const a = Math.random() * Math.PI * 2, r = 0.3 + Math.random() * 1.6;
+  s.position.set(Math.cos(a) * r, 0.5 + Math.random() * 1.5, Math.sin(a) * r * 0.6 + 0.3);
+  s.userData = { v: new THREE.Vector3((Math.random() - 0.5) * 0.4, 0.5 + Math.random() * 0.8, (Math.random() - 0.5) * 0.4), life: 0, max: 1.8 + Math.random() };
   pagoda.add(s); sparks.push(s);
 }
 
@@ -432,9 +467,9 @@ stage.addEventListener("pointermove", (e) => {
     return;
   }
   if (downAt) downAt.moved += Math.abs(dx) + Math.abs(dy);
-  if (!S.gyro) {                                // no motion sensors: drag to look around
+  if (!S.gyro && !S.xr) {                       // no motion sensors: drag to look around
     S.yaw += dx * 0.005; S.pitch = THREE.MathUtils.clamp(S.pitch + dy * 0.005, -1.35, 0.6);
-  } else if (S.phase === "worship") {           // otherwise drag turns the pagoda
+  } else if (S.phase === "worship") {           // otherwise drag turns the corner
     rotTarget += dx * 0.012; pagoda.rotation.y += dx * 0.012;
   }
 });
@@ -442,7 +477,7 @@ function endPointer(e) {
   const had = pts.delete(e.pointerId);
   if (!had) return;
   if (pts.size < 2) pinch = null;
-  if (pts.size === 0 && downAt && downAt.moved < 12 && S.phase === "place") placeAt(e.clientX, e.clientY);
+  if (pts.size === 0 && downAt && downAt.moved < 12 && S.phase === "place" && !S.xr) placeAt(e.clientX, e.clientY);
   if (pts.size === 0) downAt = null;
 }
 stage.addEventListener("pointerup", endPointer);
@@ -468,8 +503,13 @@ $("#btnStart").onclick = async () => {
   }
   app.classList.add("started");
   S.phase = "place";
-  setHint("စားပွဲ ဒါမှမဟုတ် စင်ပေါ်မှာ တစ်ချက်ထိပြီး တင်ပါ");
   setTimeout(() => { if (S.phase === "place") flash("မြေပြင်ပေါ် မတင်ပါနဲ့ — ရိုသေစွာ မြင့်တဲ့နေရာမှာ တင်ပါ", 4200); }, 1500);
+  // Phone AR (Android Chrome) finds the real surface. It has to be asked for straight from the tap.
+  if (xrOK) {
+    setHint("ဖုန်းကို စားပွဲဆီ ညွှန်ပါ။ ရွှေရောင်စက်ဝိုင်း ပေါ်လာရင် တစ်ချက်ထိပါ");
+    if (await startXR()) return;
+  }
+  setHint("စားပွဲ ဒါမှမဟုတ် စင်ပေါ်မှာ တစ်ချက်ထိပြီး တင်ပါ");
   // The phone asks permission for the sensors and the camera; the scene shows as soon as they answer
   startSensors();
   startCamera().then((ok) => {
@@ -483,7 +523,7 @@ $("#btnStart").onclick = async () => {
 };
 $("#btnReplace").onclick = () => {
   S.phase = "place"; S.placed = false; world.visible = false;
-  setHint("နေရာအသစ်မှာ တစ်ချက်ထိပြီး တင်ပါ");
+  setHint(S.xr ? "ဖုန်းကို စားပွဲဆီ ညွှန်ပြီး စက်ဝိုင်းပေါ်မှာ တစ်ချက်ထိပါ" : "နေရာအသစ်မှာ တစ်ချက်ထိပြီး တင်ပါ");
   for (const id of ["#offWater", "#offLamp", "#offFlower", "#offBell"]) $(id).disabled = true;
 };
 $("#btnDay").onclick = () => {
@@ -546,7 +586,7 @@ $("#btnShare").onclick = async () => {
 // ---------- animation loop ----------
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight;
-  if (!w || !h) return;
+  if (!w || !h || renderer.xr.isPresenting) return;
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -554,41 +594,59 @@ function resize() {
 new ResizeObserver(resize).observe(stage);
 resize();
 
+const hitPos = new THREE.Vector3();
 let last = performance.now();
-function frame(now) {
+function frame(now, xrFrame) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   const tt = now / 1000;
 
-  if (S.gyro && orient) {
+  if (xrFrame && xrSession) {
+    // phone AR: the phone gives the camera pose; look for the surface under the middle of the screen
+    const ref = renderer.xr.getReferenceSpace();
+    const vp = xrFrame.getViewerPose(ref);
+    if (vp) viewerPos.set(vp.transform.position.x, vp.transform.position.y, vp.transform.position.z);
+    hitReady = false;
+    if (S.phase === "place" && xrSource) {
+      const hits = xrFrame.getHitTestResults(xrSource);
+      if (hits.length) {
+        const p = hits[0].getPose(ref);
+        if (p) { hitPos.set(p.transform.position.x, p.transform.position.y, p.transform.position.z); hitReady = true; }
+      }
+    }
+    reticleHolder.visible = hitReady;
+    if (hitReady) {
+      reticleHolder.position.copy(hitPos);
+      reticleHolder.scale.setScalar(S.scale * 3 * (1 + 0.06 * Math.sin(tt * 4)) / 0.36);
+    }
+  } else if (S.gyro && orient) {
     if (firstGyro) { camera.quaternion.copy(orient); firstGyro = false; } else camera.quaternion.slerp(orient, 0.4);
   } else { camera.rotation.set(S.pitch, S.yaw, 0, "YXZ"); }
 
   if (world.visible) {
     pagoda.rotation.y += angDiff(pagoda.rotation.y, rotTarget) * Math.min(1, dt * 4);
-    const bob = 0.5 + 0.5 * Math.sin(tt * 2);
-    ring.material.opacity = 0.35 + 0.3 * bob;
     jewelGlow.material.opacity = (0.25 + 0.6 * (S.night || 0)) * (0.85 + 0.15 * Math.sin(tt * 3));
   }
 
-  // lamp flames flicker, and light the shrine a little
-  for (const sh of shrines) {
-    const ud = sh.userData;
+  // lamp flames flicker, and light the corner a little
+  if (corner) {
+    const ud = corner.userData;
     if (ud.lit) {
       ud.flames.forEach((f, i) => {
         const k = 1 + 0.12 * Math.sin(tt * 11 + i * 2) + 0.07 * Math.sin(tt * 23 + i);
-        f.scale.set(0.1 * k, 0.16 * (1.1 - (k - 1)), 1);
+        f.scale.set(0.2 * k, 0.32 * (1.1 - (k - 1)), 1);
       });
-      ud.light.intensity += (1.3 + 0.25 * Math.sin(tt * 9) - ud.light.intensity) * 0.1;
+      ud.light.intensity += (3 + 0.5 * Math.sin(tt * 9) - ud.light.intensity) * 0.1;
     } else ud.light.intensity += (0 - ud.light.intensity) * 0.1;
   }
 
-  // pouring water: the kettle tips over the Buddha and drops fall
-  if (pour && S.shrine) {
+  // pouring water: the kettle tips over the animal and drops fall onto it
+  drops.material.size = 0.3 * S.scale;
+  if (pour && S.corner) {
     pour.t += dt;
     const p = pour.t / pour.dur;
     const tilt = Math.min(1, p * 4, (1 - p) * 4);
-    const KX = 0.19, KY = 0.74, ang = tilt * 0.75;
-    kettle.position.set(KX, KY, -0.02);
+    const KX = 0.62, KZ = 1.0, ang = tilt * 0.75, K = 3;
+    kettle.position.set(KX, 1.72, KZ);
     kettle.rotation.z = ang;
     if (p < 0.9 && tilt > 0.5) {
       pour.acc += dt * 38;
@@ -597,9 +655,9 @@ function frame(now) {
         const i = dropLife.findIndex((l) => l <= 0);
         if (i < 0) break;
         // the spout tip, turned with the kettle
-        const tipx = KX - 0.105 * Math.cos(ang) - 0.045 * Math.sin(ang), tipy = KY - 0.105 * Math.sin(ang) + 0.045 * Math.cos(ang);
-        dropPos.set([tipx, tipy, -0.02 + (Math.random() - 0.5) * 0.012], i * 3);
-        dropVel.set([-0.1 - Math.random() * 0.05, 0, (Math.random() - 0.5) * 0.03], i * 3);
+        const tipx = KX + K * (-0.105 * Math.cos(ang) - 0.045 * Math.sin(ang)), tipy = 1.72 + K * (-0.105 * Math.sin(ang) + 0.045 * Math.cos(ang));
+        dropPos.set([tipx, tipy, KZ + (Math.random() - 0.5) * 0.04], i * 3);
+        dropVel.set([-0.3 - Math.random() * 0.15, 0, (Math.random() - 0.5) * 0.1], i * 3);
         dropLife[i] = 1;
       }
     }
@@ -607,7 +665,7 @@ function frame(now) {
   }
   for (let i = 0; i < DROPS; i++) {
     if (dropLife[i] <= 0) continue;
-    dropVel[3 * i + 1] -= 1.6 * dt;
+    dropVel[3 * i + 1] -= 4.8 * dt;
     dropPos[3 * i] += dropVel[3 * i] * dt; dropPos[3 * i + 1] += dropVel[3 * i + 1] * dt; dropPos[3 * i + 2] += dropVel[3 * i + 2] * dt;
     if (dropPos[3 * i + 1] < 0.08) { dropLife[i] = 0; dropPos.set([0, -100, 0], 3 * i); }
   }
@@ -637,11 +695,10 @@ function frame(now) {
   }
 
   renderer.render(scene, camera);
-  requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+renderer.setAnimationLoop(frame);          // also what phone AR needs
 
 // small hook for testing: open with ?debug
 if (new URLSearchParams(location.search).has("debug")) {
-  window.__pagoda = { S, world, pagoda, camera, scene, renderer, shrines, selectDay, placeAt, enterWorship, sadhu, merit };
+  window.__pagoda = { S, world, pagoda, camera, scene, renderer, get corner() { return corner; }, selectDay, placeAt, enterWorship, sadhu, merit, setScale };
 }

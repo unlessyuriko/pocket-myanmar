@@ -18,10 +18,13 @@ Face tracking uses Google MediaPipe Face Landmarker and runs entirely on the dev
 
 ## Feature 2: Pagoda at Home (ဘုရားဖူး)
 
-Open `pagoda.html` (linked from the start screen). A golden Shwedagon-style pagoda appears over the rear camera, and you worship at the shrine for the weekday you were born on.
+Open `pagoda.html` (linked from the start screen). Only your own birth-day corner appears over the rear camera, like the weekday corners at the Shwedagon: a seated Buddha on a gold drum, your animal in a tiled basin in front, a bell frame beside it, and the golden Shwedagon with a long arcade wall as the backdrop. The eight animals (tiger, lion, two elephants, rat, guinea pig, naga, garuda) are modelled in code.
 
-- **Place it:** pick your birth day (Wednesday morning and Rahu are separate), tap a table or shelf, and the pagoda stays there as you move the phone (it uses the phone's motion sensors; there is no surface detection, so it holds its direction but not its position if you walk). Pinch or use the slider to change its size; drag to turn it.
-- **Worship:** pour water over the Buddha image, light the lamps, offer flowers and ring the bell. Doing all four gives "သာဓု သာဓု သာဓု". A small merit count and day streak are kept on the phone only.
+- **Place it:** pick your birth day (Wednesday morning and Rahu are separate), point at a table or shelf and tap.
+  - On phones with WebXR AR (Android Chrome), the app finds the real flat surface: a ring shows where it will land, and the corner stays stuck to that surface as you walk around. The camera is shown by the phone, so the photo button is off there; use the phone's screenshot.
+  - On iPhone Safari there is no surface detection. It uses the motion sensors and assumes the table is 0.45 m below the phone, so it holds its direction but not its position if you walk.
+  - Pinch or use the slider to change its size; drag to turn it.
+- **Worship:** pour water over your animal, light the lamps, offer flowers and ring the bell. Doing all four gives "သာဓု သာဓု သာဓု". A small merit count and day streak are kept on the phone only.
 - **Lighting** follows the time in Yangon (morning, day, evening, night).
 - **Photo:** a share card with the scene, your weekday animal and merit count.
 - Everything is drawn in code (no model files) with three.js, and the sounds are made with the Web Audio API.

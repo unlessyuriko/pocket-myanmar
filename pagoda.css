@@ -77,6 +77,9 @@
 .tools .strength { flex: 1 1 120px; }
 
 .pagoda:not(.started) .shutter-row { display: none; }
+/* phone AR draws the camera itself, so the page must be see-through (and the photo button is off: use the phone's screenshot) */
+html:has(.pagoda.xr), body:has(.pagoda.xr), .pagoda.xr, .pagoda.xr .stage { background: transparent !important; }
+.pagoda.xr #video, .pagoda.xr #gl, .pagoda.xr .shutter-row { display: none; }
 .pagoda .shutter-row { bottom: 12px; }
 .pagoda .shutter { width: 58px; height: 58px; padding: 4px; }
 .pagoda .intro-card { max-width: 360px; }

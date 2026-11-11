@@ -1,6 +1,7 @@
 // The 3D pieces of "Pagoda at Home", all built from simple shapes in code (no model files):
-// a golden stupa in the style of Shwedagon, the eight weekday shrines around it, and the
-// small things you offer (water, lamps, flowers, a bell).
+// your birth-day corner (a seated Buddha on a gold drum, the animal statue in a tiled basin below),
+// and, far behind it, Shwedagon and an arcade wall. Plus the small things you offer
+// (water, lamps, flowers, a bell).
 import * as THREE from "three";
 
 // The eight birth-day posts. Wednesday is split into morning and afternoon (Rahu), as in Myanmar.
@@ -15,36 +16,127 @@ export const DAYS = [
   { id: "sun", day: "တနင်္ဂနွေ", animal: "ဂဠုန်", emoji: "🦅" },
 ];
 
+// ---------- painted textures ----------
+function canvasTex(w, h, draw, repeat) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
+  return t;
+}
+const archPath = (x, x0, y0, w, h) => {
+  x.beginPath();
+  x.moveTo(x0, y0 + h);
+  x.lineTo(x0, y0 + w / 2);
+  x.arc(x0 + w / 2, y0 + w / 2, w / 2, Math.PI, 0);
+  x.lineTo(x0 + w, y0 + h);
+  x.closePath();
+};
+
+// white and grey floor tiles
+const tileTex = (repeat) => canvasTex(256, 256, (x, w, h) => {
+  x.fillStyle = "#e9e6df"; x.fillRect(0, 0, w, h);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    x.fillStyle = (i + j) % 2 ? "#e2ded5" : "#ece9e2";
+    x.fillRect(i * 64 + 2, j * 64 + 2, 60, 60);
+  }
+  x.strokeStyle = "#b9b4a8"; x.lineWidth = 2;
+  for (let i = 0; i <= 4; i++) { x.beginPath(); x.moveTo(i * 64, 0); x.lineTo(i * 64, h); x.stroke(); x.beginPath(); x.moveTo(0, i * 64); x.lineTo(w, i * 64); x.stroke(); }
+}, repeat);
+
+// gold drum with a ring of arched panels, like the bases at the Shwedagon corners
+const drumTex = () => canvasTex(1024, 256, (x, w, h) => {
+  const g = x.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "#e8c068"); g.addColorStop(1, "#c8962f");
+  x.fillStyle = g; x.fillRect(0, 0, w, h);
+  const n = 8, pw = w / n;
+  for (let i = 0; i < n; i++) {
+    const x0 = i * pw + pw * 0.14, aw = pw * 0.72;
+    archPath(x, x0, h * 0.1, aw, h * 0.8);
+    x.fillStyle = "#f3d68a"; x.fill();
+    x.lineWidth = 7; x.strokeStyle = "#7a4d12"; x.stroke();
+    archPath(x, x0 + 14, h * 0.1 + 14, aw - 28, h * 0.8 - 28);
+    x.fillStyle = "#d9a843"; x.fill();
+    x.lineWidth = 3; x.strokeStyle = "#8a5a18"; x.stroke();
+    // a small flower in the middle of each arch
+    x.fillStyle = "#9c3b2a";
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; x.beginPath(); x.arc(x0 + aw / 2 + Math.cos(a) * 14, h * 0.5 + Math.sin(a) * 14, 8, 0, 7); x.fill(); }
+    x.fillStyle = "#f7de9a"; x.beginPath(); x.arc(x0 + aw / 2, h * 0.5, 8, 0, 7); x.fill();
+  }
+});
+
+// the long gold arcade wall behind the corner
+const arcadeTex = () => canvasTex(1536, 320, (x, w, h) => {
+  x.fillStyle = "#d9a53a"; x.fillRect(0, 0, w, h);
+  const n = 6, pw = w / n;
+  for (let i = 0; i < n; i++) {
+    const x0 = i * pw + pw * 0.16, aw = pw * 0.68;
+    archPath(x, x0 - 12, 30, aw + 24, h - 30);
+    x.fillStyle = "#b9862a"; x.fill();
+    archPath(x, x0, 48, aw, h - 48);
+    const g = x.createLinearGradient(0, 40, 0, h);
+    g.addColorStop(0, "#0e5e4c"); g.addColorStop(1, "#06382e");
+    x.fillStyle = g; x.fill();
+    x.lineWidth = 6; x.strokeStyle = "#f3d68a"; x.stroke();
+  }
+  x.fillStyle = "#f3d68a"; x.fillRect(0, 0, w, 14);
+  x.fillStyle = "#8a5a18"; x.fillRect(0, 14, w, 6);
+});
+
 export function makeMaterials() {
+  const std = (o) => new THREE.MeshStandardMaterial(o);
   return {
-    gold: new THREE.MeshStandardMaterial({ color: 0xe3b85c, metalness: 0.92, roughness: 0.26 }),
-    goldDeep: new THREE.MeshStandardMaterial({ color: 0xb98826, metalness: 0.9, roughness: 0.34 }),
-    marble: new THREE.MeshStandardMaterial({ color: 0xf0e6d2, metalness: 0.05, roughness: 0.55 }),
-    red: new THREE.MeshStandardMaterial({ color: 0x8e2c28, metalness: 0.2, roughness: 0.5 }),
-    wood: new THREE.MeshStandardMaterial({ color: 0x5a3a22, metalness: 0.05, roughness: 0.7 }),
-    jade: new THREE.MeshStandardMaterial({ color: 0x1f6b52, metalness: 0.3, roughness: 0.4 }),
+    gold: std({ color: 0xe3b85c, metalness: 0.92, roughness: 0.26 }),
+    goldDeep: std({ color: 0xb98826, metalness: 0.9, roughness: 0.34 }),
+    marble: std({ color: 0xf0e6d2, metalness: 0.05, roughness: 0.55 }),
+    red: std({ color: 0x8e2c28, metalness: 0.2, roughness: 0.5 }),
+    wood: std({ color: 0x5a3a22, metalness: 0.05, roughness: 0.7 }),
+    skin: std({ color: 0xf4eadb, metalness: 0.0, roughness: 0.55 }),
+    dark: std({ color: 0x1a1208, metalness: 0.0, roughness: 0.4 }),
+    drum: std({ map: drumTex(), metalness: 0.55, roughness: 0.4 }),
+    arcade: std({ map: arcadeTex(), metalness: 0.2, roughness: 0.55 }),
+    floor: std({ map: tileTex([7, 6]), roughness: 0.55 }),
+    tile: std({ map: tileTex([1.2, 0.5]), roughness: 0.5 }),
   };
 }
 
 const lathe = (pts, seg, mat) => new THREE.Mesh(new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg), mat);
+const ell = (m, rx, ry, rz, x, y, z, mat) => {
+  const o = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), mat);
+  o.scale.set(rx, ry, rz); o.position.set(x, y, z);
+  return o;
+};
+const cyl = (r0, r1, h, x, y, z, mat) => {
+  const o = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 14), mat);
+  o.position.set(x, y, z);
+  return o;
+};
+const cone = (r, h, x, y, z, mat, rx = 0, rz = 0) => {
+  const o = new THREE.Mesh(new THREE.ConeGeometry(r, h, 14), mat);
+  o.position.set(x, y, z); o.rotation.set(rx, 0, rz);
+  return o;
+};
+const tube = (pts, r, mat, seg = 28) =>
+  new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p))), seg, r, 10, false), mat);
 
-// ---------- the stupa ----------
-export function buildStupa(m) {
+// ---------- the stupa (Shwedagon style) ----------
+export function buildStupa(m, { plinth = true } = {}) {
   const g = new THREE.Group();
-
-  // wide marble platform, then three gold octagonal terraces
-  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.2, 0.1, 8), m.marble);
-  plinth.position.y = 0.05; plinth.rotation.y = Math.PI / 8;
-  g.add(plinth);
-  let y = 0.1;
+  let y = 0;
+  if (plinth) {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.2, 0.1, 8), m.marble);
+    p.position.y = 0.05; p.rotation.y = Math.PI / 8;
+    g.add(p); y = 0.1;
+  }
   for (const [r, h] of [[1.55, 0.14], [1.32, 0.13], [1.12, 0.12]]) {
     const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.04, h, 8), m.gold);
     t.position.y = y + h / 2; t.rotation.y = Math.PI / 8;
     g.add(t); y += h;
   }
   const bellBase = y;
-
-  // the bell: wide at the foot, curving in to a slender spire
   const prof = new THREE.SplineCurve([
     [0.86, 0], [0.86, 0.03], [0.8, 0.14], [0.68, 0.34], [0.55, 0.6], [0.44, 0.88],
     [0.36, 1.14], [0.3, 1.38], [0.26, 1.58], [0.24, 1.74],
@@ -59,15 +151,12 @@ export function buildStupa(m) {
     }
     return prof[prof.length - 1].x;
   };
-  // fine raised rings up the bell
   for (let yy = 0.22; yy < 1.7; yy += 0.12) {
     const ring = new THREE.Mesh(new THREE.TorusGeometry(rAt(yy) + 0.004, 0.011, 8, 56), m.goldDeep);
     ring.rotation.x = Math.PI / 2; ring.position.y = bellBase + yy;
     g.add(ring);
   }
   const top = bellBase + 1.74;
-
-  // lotus band, banana bud, then the umbrella (hti) with its vane and jewel
   const lotus = lathe([[0.26, 0], [0.36, 0.05], [0.4, 0.1], [0.34, 0.17], [0.22, 0.24], [0.16, 0.26]], 40, m.gold);
   lotus.position.y = top;
   g.add(lotus);
@@ -77,9 +166,9 @@ export function buildStupa(m) {
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.014, 0.62, 10), m.goldDeep);
   pole.position.y = top + 0.88;
   g.add(pole);
+  const tierMat = m.gold.clone(); tierMat.side = THREE.DoubleSide;
   for (let k = 0; k < 4; k++) {
-    const tier = new THREE.Mesh(new THREE.ConeGeometry(0.3 - k * 0.045, 0.07, 28, 1, true), m.gold);
-    tier.material = m.gold.clone(); tier.material.side = THREE.DoubleSide;
+    const tier = new THREE.Mesh(new THREE.ConeGeometry(0.3 - k * 0.045, 0.07, 28, 1, true), tierMat);
     tier.position.y = top + 0.72 + k * 0.1;
     g.add(tier);
   }
@@ -91,60 +180,155 @@ export function buildStupa(m) {
     new THREE.MeshStandardMaterial({ color: 0xfff6dd, emissive: 0xffe9a8, emissiveIntensity: 1.2, roughness: 0.2 }));
   jewel.position.y = top + 1.42;
   g.add(jewel);
-  g.userData.height = top + 1.45;
   g.userData.jewel = jewel;
+  g.userData.height = top + 1.45;
   return g;
 }
 
 // ---------- a seated Buddha image ----------
 export function buildBuddha(m) {
   const g = new THREE.Group();
-  const pedestal = lathe([[0.0, 0], [0.26, 0], [0.3, 0.04], [0.24, 0.1], [0.2, 0.13], [0.0, 0.13]], 32, m.goldDeep);
-  g.add(pedestal);
-  const legs = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), m.gold);
-  legs.scale.set(0.24, 0.07, 0.16); legs.position.y = 0.17;
-  g.add(legs);
+  const legs = ell(m, 0.24, 0.07, 0.16, 0, 0.17, 0, m.gold);
   const body = lathe([[0.0, 0], [0.14, 0], [0.13, 0.08], [0.115, 0.17], [0.1, 0.24], [0.0, 0.26]], 28, m.gold);
   body.position.y = 0.2;
-  g.add(body);
-  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), m.gold);
-  shoulders.scale.set(0.15, 0.065, 0.1); shoulders.position.y = 0.4;
-  g.add(shoulders);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.07, 24, 18), m.gold);
-  head.position.y = 0.5;
-  g.add(head);
-  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 12), m.gold);
-  knot.position.y = 0.57;
-  g.add(knot);
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.05, 10), m.gold);
-  flame.position.y = 0.625;
-  g.add(flame);
-  const hands = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), m.gold);
-  hands.scale.set(0.085, 0.03, 0.055); hands.position.set(0, 0.255, 0.1);
-  g.add(hands);
+  const shoulders = ell(m, 0.15, 0.065, 0.1, 0, 0.4, 0, m.gold);
+  const head = ell(m, 0.07, 0.075, 0.07, 0, 0.5, 0, m.skin);
+  const knot = ell(m, 0.04, 0.04, 0.04, 0, 0.57, 0, m.dark);
+  const flame = cone(0.014, 0.05, 0, 0.625, 0, m.gold);
+  const hands = ell(m, 0.085, 0.03, 0.055, 0, 0.255, 0.1, m.skin);
+  const crown = lathe([[0.072, 0], [0.078, 0.015], [0.07, 0.03]], 24, m.gold);
+  crown.position.y = 0.535;
+  const eyes = [-1, 1].map((s) => ell(m, 0.009, 0.005, 0.006, s * 0.026, 0.508, 0.066, m.dark));
+  const mouth = ell(m, 0.014, 0.004, 0.005, 0, 0.47, 0.067, m.red);
+  g.add(legs, body, shoulders, head, knot, flame, hands, crown, mouth, ...eyes);
+  return g;
+}
+
+// ---------- the eight animal statues (golden, in a simple style), all facing +z ----------
+export function buildAnimal(id, m) {
+  const g = new THREE.Group();
+  const eye = (x, y, z, r = 0.025) => ell(m, r, r, r, x, y, z, m.dark);
+  const gold = m.gold;
+
+  // a cat sitting up, facing you: tiger, or lion with a mane
+  const cat = (lion) => {
+    g.add(ell(m, 0.3, 0.3, 0.36, 0, 0.3, -0.12, gold));
+    g.add(ell(m, 0.25, 0.42, 0.26, 0, 0.56, 0.0, gold));
+    for (const s of [-1, 1]) {
+      g.add(cyl(0.075, 0.08, 0.5, s * 0.15, 0.27, 0.16, gold));
+      g.add(ell(m, 0.09, 0.05, 0.13, s * 0.15, 0.04, 0.22, gold));
+      g.add(ell(m, 0.075, 0.075, 0.07, s * 0.14, 1.18, -0.02, gold));          // ears
+      g.add(eye(s * 0.085, 1.02, 0.18));
+    }
+    if (lion) { g.add(ell(m, 0.36, 0.38, 0.28, 0, 1.0, -0.06, m.goldDeep)); }
+    g.add(ell(m, 0.21, 0.2, 0.2, 0, 1.0, 0.06, gold));                             // head
+    g.add(ell(m, 0.11, 0.08, 0.11, 0, 0.94, 0.22, gold));                          // muzzle
+    g.add(ell(m, 0.03, 0.02, 0.02, 0, 0.98, 0.32, m.dark));                        // nose
+    g.add(tube([[0.24, 0.1, -0.25], [0.5, 0.18, -0.05], [0.52, 0.4, 0.2], [0.4, 0.55, 0.25]], 0.05, gold));
+    if (!lion) for (let i = 0; i < 4; i++) {                                       // stripes
+      const s = ell(m, 0.26, 0.018, 0.27, 0, 0.35 + i * 0.12, 0.0, m.goldDeep);
+      g.add(s);
+    }
+  };
+
+  const elephant = (tusks) => {
+    g.add(ell(m, 0.44, 0.42, 0.62, 0, 0.68, -0.1, gold));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(cyl(0.12, 0.13, 0.5, sx * 0.26, 0.25, sz * 0.32 - 0.05, gold));
+    g.add(ell(m, 0.3, 0.33, 0.3, 0, 0.88, 0.42, gold));
+    for (const s of [-1, 1]) {
+      const ear = ell(m, 0.3, 0.32, 0.05, s * 0.36, 0.9, 0.36, m.goldDeep);
+      ear.rotation.y = s * 0.55; g.add(ear);
+      g.add(eye(s * 0.14, 0.97, 0.68, 0.028));
+    }
+    g.add(tube([[0, 0.85, 0.66], [0, 0.55, 0.82], [0, 0.28, 0.84], [0.02, 0.12, 0.98]], 0.085, gold));
+    if (tusks) for (const s of [-1, 1]) {
+      const t = cone(0.035, 0.34, s * 0.17, 0.66, 0.78, m.skin, Math.PI / 2 + 0.5, 0);
+      g.add(t);
+    }
+    g.add(tube([[0, 0.8, -0.7], [0.03, 0.55, -0.78], [0.02, 0.32, -0.72]], 0.025, gold));
+    g.scale.setScalar(0.9);
+  };
+
+  const rat = () => {
+    g.add(ell(m, 0.28, 0.38, 0.28, 0, 0.4, -0.02, gold));
+    g.add(ell(m, 0.19, 0.18, 0.22, 0, 0.84, 0.08, gold));
+    g.add(cone(0.1, 0.22, 0, 0.8, 0.3, gold, Math.PI / 2, 0));
+    g.add(ell(m, 0.03, 0.03, 0.03, 0, 0.8, 0.41, m.dark));
+    for (const s of [-1, 1]) {
+      g.add(ell(m, 0.12, 0.13, 0.03, s * 0.16, 1.0, 0.0, m.goldDeep));
+      g.add(eye(s * 0.085, 0.89, 0.24, 0.022));
+      g.add(ell(m, 0.05, 0.05, 0.1, s * 0.1, 0.52, 0.23, gold));
+      g.add(ell(m, 0.08, 0.04, 0.14, s * 0.13, 0.04, 0.12, gold));
+    }
+    g.add(tube([[0, 0.1, -0.22], [0.25, 0.04, -0.45], [0.5, 0.06, -0.4], [0.62, 0.2, -0.25]], 0.025, gold));
+    g.scale.setScalar(1.1);
+  };
+
+  const guineaPig = () => {
+    g.add(ell(m, 0.42, 0.34, 0.5, 0, 0.34, -0.05, gold));
+    g.add(ell(m, 0.27, 0.27, 0.28, 0, 0.4, 0.42, gold));
+    g.add(ell(m, 0.05, 0.04, 0.04, 0, 0.38, 0.68, m.dark));
+    for (const s of [-1, 1]) {
+      g.add(ell(m, 0.08, 0.1, 0.04, s * 0.2, 0.6, 0.34, m.goldDeep));
+      g.add(eye(s * 0.12, 0.47, 0.64, 0.03));
+      g.add(ell(m, 0.08, 0.05, 0.12, s * 0.16, 0.05, 0.4, gold));
+    }
+    g.scale.setScalar(1.15);
+  };
+
+  // a naga: coils with a raised, hooded head
+  const naga = () => {
+    const pts = [];
+    for (let i = 0; i <= 26; i++) {
+      const a = (i / 26) * Math.PI * 5, r = 0.52 - i * 0.008;
+      pts.push([Math.cos(a) * r, 0.1 + (i / 26) * 0.3 + (Math.sin(a * 2) * 0.01), Math.sin(a) * r]);
+    }
+    pts.push([0.12, 0.5, 0.1], [0.02, 0.8, 0.05], [0.0, 1.05, 0.1], [0, 1.2, 0.16]);
+    g.add(tube(pts, 0.11, gold, 90));
+    g.add(ell(m, 0.3, 0.3, 0.05, 0, 1.25, 0.04, m.goldDeep));                       // hood
+    g.add(ell(m, 0.13, 0.11, 0.18, 0, 1.2, 0.2, gold));
+    for (const s of [-1, 1]) g.add(eye(s * 0.07, 1.25, 0.31, 0.022));
+    g.add(cone(0.03, 0.12, 0, 1.52, 0.04, m.skin));
+  };
+
+  // garuda, standing with wings spread
+  const garuda = () => {
+    g.add(ell(m, 0.22, 0.36, 0.18, 0, 0.62, 0, gold));
+    for (const s of [-1, 1]) {
+      g.add(cyl(0.05, 0.06, 0.34, s * 0.1, 0.17, 0.04, gold));
+      g.add(ell(m, 0.08, 0.03, 0.14, s * 0.1, 0.03, 0.1, gold));
+      const w = ell(m, 0.5, 0.07, 0.2, s * 0.5, 0.92, -0.08, m.goldDeep);
+      w.rotation.z = s * 0.7; g.add(w);
+      const w2 = ell(m, 0.4, 0.05, 0.15, s * 0.58, 0.72, -0.1, gold);
+      w2.rotation.z = s * 0.35; g.add(w2);
+      g.add(eye(s * 0.05, 1.12, 0.13, 0.02));
+    }
+    g.add(ell(m, 0.13, 0.14, 0.13, 0, 1.1, 0.04, m.skin));
+    g.add(cone(0.05, 0.16, 0, 1.06, 0.2, gold, Math.PI / 2 + 0.4, 0));
+    g.add(cone(0.06, 0.16, 0, 1.3, 0.04, gold));
+    for (let i = -2; i <= 2; i++) { const t = ell(m, 0.04, 0.2, 0.025, i * 0.07, 0.36, -0.2, m.goldDeep); t.rotation.z = i * 0.2; g.add(t); }
+    g.scale.setScalar(1.05);
+  };
+
+  ({ mon: () => cat(false), tue: () => cat(true), wed: () => elephant(true), rahu: () => elephant(false),
+     thu: rat, fri: guineaPig, sat: naga, sun: garuda })[id]();
   return g;
 }
 
 // ---------- small textures ----------
 function plaqueTexture(day, font) {
   const c = document.createElement("canvas");
-  c.width = 320; c.height = 300;
+  c.width = 512; c.height = 200;
   const x = c.getContext("2d");
-  x.fillStyle = "rgba(6, 32, 26, 0.9)";
-  x.beginPath(); x.roundRect(6, 6, 308, 288, 34); x.fill();
-  x.strokeStyle = "#e3b85c"; x.lineWidth = 6; x.stroke();
-  x.font = "130px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
-  x.textAlign = "center"; x.textBaseline = "middle";
-  x.fillText(day.emoji, 160, 112);
-  x.fillStyle = "#f7de9a";
-  x.font = `700 40px ${font}`;
-  x.fillText(day.day, 160, 208, 280);
-  x.fillStyle = "#d6bf9f";
-  x.font = `400 30px ${font}`;
-  x.fillText(day.animal, 160, 254, 280);
+  const g = x.createLinearGradient(0, 0, 0, 200);
+  g.addColorStop(0, "#d9dde0"); g.addColorStop(1, "#9aa1a6");
+  x.fillStyle = g; x.beginPath(); x.roundRect(4, 4, 504, 192, 16); x.fill();
+  x.strokeStyle = "#5c6368"; x.lineWidth = 6; x.stroke();
+  x.fillStyle = "#1c2226"; x.textAlign = "center"; x.textBaseline = "middle";
+  x.font = `700 70px ${font}`; x.fillText(day.day, 256, 66, 470);
+  x.font = `600 52px ${font}`; x.fillText(day.animal, 256, 140, 470);
   const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return t;
 }
 
@@ -177,98 +361,170 @@ export function glowTexture() {
   return new THREE.CanvasTexture(c);
 }
 
-// ---------- a weekday shrine ----------
-// Local +z points away from the pagoda, towards the worshipper.
-export function buildShrine(m, day, font) {
+// ---------- the corner you worship at ----------
+// Local +z points towards you. The floor is y = 0.
+export const TABLE_Y = 1.86;       // top of the drum the Buddha sits on
+export const BOWL_Y = 2.34;        // top of the gold bowl under the Buddha
+export function buildCorner(m, day, font) {
   const g = new THREE.Group();
-  const W = 0.62, D = 0.5;
 
-  const base = new THREE.Mesh(new THREE.BoxGeometry(W, 0.06, D), m.marble);
-  base.position.y = 0.03;
-  g.add(base);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.02, 0.8, 10), m.red);
-    p.position.set(sx * (W / 2 - 0.04), 0.46, sz * (D / 2 - 0.04));
-    g.add(p);
+  // low marble slab with tiled floor
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.12, 4.6), m.floor);
+  slab.position.set(0, -0.06, -0.4);
+  g.add(slab);
+
+  // the tiled basin that holds the animal: a half ring in front, open towards the pillars
+  const ringShape = new THREE.Shape();
+  ringShape.absarc(0, 0, 1.95, -Math.PI / 2, Math.PI / 2, false);
+  ringShape.absarc(0, 0, 1.75, Math.PI / 2, -Math.PI / 2, true);
+  const basin = new THREE.Mesh(new THREE.ExtrudeGeometry(ringShape, { depth: 0.3, bevelEnabled: false, curveSegments: 32 }), m.tile);
+  basin.rotation.x = -Math.PI / 2; basin.rotation.z = -Math.PI / 2;
+  basin.position.set(0, 0, 0);
+  g.add(basin);
+  // inside: a slightly raised tiled floor
+  const inner = new THREE.Mesh(new THREE.CircleGeometry(1.75, 48, -Math.PI / 2, Math.PI), m.floor);
+  inner.rotation.x = -Math.PI / 2; inner.rotation.z = -Math.PI / 2; inner.position.y = 0.01;
+  g.add(inner);
+
+  // four gold pillars and the drum on top (the animal stands between them)
+  for (const a of [-135, -60, 60, 135]) {
+    const r = 0.88, ang = (a * Math.PI) / 180;
+    g.add(cyl(0.1, 0.12, 1.5, Math.sin(ang) * r, 0.75, Math.cos(ang) * r, m.goldDeep));
   }
-  // the roof sits back a little and is smaller, so the Buddha still shows when you look down at it
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.16, 4), m.red);
-  roof.position.set(0, 0.97, -0.1); roof.rotation.y = Math.PI / 4;
-  g.add(roof);
-  const roofTop = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.16, 4), m.gold);
-  roofTop.position.set(0, 1.08, -0.1); roofTop.rotation.y = Math.PI / 4;
-  g.add(roofTop);
-  const finial = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 10), m.gold);
-  finial.position.set(0, 1.18, -0.1);
-  g.add(finial);
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.36, 32, 1), m.drum);
+  drum.position.y = TABLE_Y - 0.18;
+  g.add(drum);
+  for (const [r, y, h] of [[1.12, TABLE_Y - 0.36, 0.06], [1.12, TABLE_Y, 0.06], [0.98, TABLE_Y + 0.04, 0.04]]) {
+    const ring = cyl(r, r, h, 0, y, 0, m.gold);
+    g.add(ring);
+  }
 
+  // name plate on the front of the drum, like the silver ones at the pagoda
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.2), new THREE.MeshBasicMaterial({ map: plaqueTexture(day, font), transparent: true }));
+  plate.position.set(0, TABLE_Y - 0.18, 1.06);
+  g.add(plate);
+
+  // the gold bowl and the Buddha on it
+  const bowl = lathe([[0.0, 0], [0.6, 0], [0.7, 0.06], [0.76, 0.2], [0.72, 0.34], [0.62, 0.42], [0.56, 0.44], [0.0, 0.44]], 40, m.gold);
+  bowl.position.y = TABLE_Y + 0.04;
+  bowl.scale.set(0.62, 0.8, 0.62);
+  g.add(bowl);
   const buddha = buildBuddha(m);
-  buddha.scale.setScalar(0.8);
-  buddha.position.set(0, 0.06, -0.02);
+  buddha.scale.setScalar(2.1);
+  buddha.position.set(0, TABLE_Y + 0.04 + 0.44 * 0.8 - 0.02, 0);
   g.add(buddha);
 
-  // name plaque in front, with the weekday and its animal
-  const plaque = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.26),
-    new THREE.MeshBasicMaterial({ map: plaqueTexture(day, font), transparent: true }));
-  plaque.position.set(0, 0.13, D / 2 + 0.08);
-  plaque.rotation.x = -0.6;
-  g.add(plaque);
-
-  // offering bowl for flowers (right) and a water cup (left)
-  const bowl = lathe([[0, 0], [0.07, 0.0], [0.09, 0.035], [0.1, 0.05], [0.085, 0.05], [0.06, 0.02], [0, 0.015]], 20, m.gold);
-  bowl.position.set(0.2, 0.06, 0.3);
-  g.add(bowl);
-  const cup = lathe([[0, 0], [0.03, 0], [0.04, 0.07], [0.045, 0.1], [0.038, 0.1], [0.03, 0.06], [0, 0.01]], 18, m.gold);
-  cup.position.set(-0.2, 0.06, 0.3);
+  // offering bowl for flowers (right) and a water cup (left) on the drum's rim
+  const flowerBowl = lathe([[0, 0], [0.18, 0], [0.24, 0.07], [0.26, 0.11], [0.22, 0.11], [0.16, 0.04], [0, 0.03]], 24, m.gold);
+  flowerBowl.position.set(0.72, TABLE_Y + 0.04, 0.5);
+  g.add(flowerBowl);
+  const cup = lathe([[0, 0], [0.07, 0], [0.1, 0.16], [0.11, 0.24], [0.09, 0.24], [0.07, 0.14], [0, 0.02]], 20, m.gold);
+  cup.position.set(-0.72, TABLE_Y + 0.04, 0.5);
   g.add(cup);
 
   // two lamps, off until you light them
   const flames = [];
   for (const sx of [-1, 1]) {
-    const stand = lathe([[0, 0], [0.04, 0], [0.025, 0.05], [0.02, 0.12], [0.045, 0.16], [0.0, 0.16]], 16, m.gold);
-    stand.position.set(sx * 0.27, 0.06, 0.12);
+    const stand = lathe([[0, 0], [0.09, 0], [0.05, 0.1], [0.04, 0.26], [0.09, 0.34], [0.0, 0.34]], 20, m.gold);
+    stand.position.set(sx * 0.86, TABLE_Y + 0.04, -0.05);
     g.add(stand);
     const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-    f.scale.set(0.1, 0.16, 1); f.position.set(sx * 0.27, 0.27, 0.12); f.visible = false;
+    f.scale.set(0.2, 0.32, 1); f.position.set(sx * 0.86, TABLE_Y + 0.46, -0.05); f.visible = false;
     g.add(f); flames.push(f);
   }
-  const light = new THREE.PointLight(0xffb45a, 0, 1.4, 1.6);
-  light.position.set(0, 0.3, 0.2);
+  const light = new THREE.PointLight(0xffb45a, 0, 6, 1.6);
+  light.position.set(0, TABLE_Y + 0.5, 1.2);
   g.add(light);
 
-  // a hanging bell on a small frame beside the shrine
+  // a hanging bell on a wooden frame to the left
   const frame = new THREE.Group();
-  frame.position.set(-0.58, 0, 0.1);
+  frame.position.set(-2.0, 0, 0.5);
+  frame.scale.setScalar(2.6);
   for (const sx of [-0.12, 0.12]) {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.46, 8), m.wood);
-    post.position.set(sx, 0.23, 0); frame.add(post);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.5, 8), m.wood);
+    post.position.set(sx, 0.25, 0); frame.add(post);
   }
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.28, 8), m.wood);
-  beam.rotation.z = Math.PI / 2; beam.position.y = 0.46; frame.add(beam);
+  beam.rotation.z = Math.PI / 2; beam.position.y = 0.5; frame.add(beam);
   const pivot = new THREE.Group();
-  pivot.position.y = 0.45;
+  pivot.position.y = 0.49;
   const bellMesh = lathe([[0.0, 0], [0.06, 0], [0.075, -0.02], [0.065, -0.09], [0.04, -0.14], [0.0, -0.16]], 24, m.goldDeep);
-  bellMesh.scale.y = 1; bellMesh.position.y = -0.02;
+  bellMesh.position.y = -0.02;
   pivot.add(bellMesh);
   frame.add(pivot);
   g.add(frame);
 
-  g.userData = { day, buddha, flames, light, bowl, cup, bell: pivot, flowers: [] };
+  // the drum, Buddha and lamps sit towards the back; the animal stands in the basin in front
+  const core = new THREE.Group();
+  core.position.z = -0.45;
+  for (const o of [...g.children]) if (o !== slab && o !== basin && o !== inner) core.add(o);
+  g.add(core);
+
+  g.userData = {
+    day, plate, buddha, flames, light, cup, bell: pivot, flowers: [], animal: null,
+    bowlPos: flowerBowl.position.clone().add(new THREE.Vector3(0, 0, -0.45)), font,
+  };
+  setCornerDay(g, day, m, font);
+  return g;
+}
+
+// Swap in the animal and name plate for another birth day
+export function setCornerDay(corner, day, m, font = corner.userData.font) {
+  const ud = corner.userData;
+  ud.day = day;
+  if (ud.animal) corner.remove(ud.animal);
+  ud.animal = buildAnimal(day.id, m);
+  ud.animal.scale.multiplyScalar(0.85);
+  ud.animal.position.set(0, 0.02, 1.0);
+  corner.add(ud.animal);
+  ud.plate.material.map.dispose();
+  ud.plate.material.map = plaqueTexture(day, font);
+  ud.plate.material.needsUpdate = true;
+}
+
+// ---------- the view behind: an arcade wall and Shwedagon ----------
+export function buildBackdrop(m) {
+  const g = new THREE.Group();
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(11, 2.0), m.arcade);
+  wall.position.set(0, 1.0, -2.8);
+  g.add(wall);
+  for (const sx of [-1, 1]) {
+    g.add(cyl(0.16, 0.2, 2.3, sx * 5.5, 1.15, -2.75, m.gold));
+    g.add(cyl(0.26, 0.18, 0.18, sx * 5.5, 2.38, -2.75, m.gold));
+  }
+  // a platform step in front of the wall
+  const step = new THREE.Mesh(new THREE.BoxGeometry(11.2, 0.12, 0.7), m.marble);
+  step.position.set(0, 0.06, -2.65);
+  g.add(step);
+  const stupa = buildStupa(m, { plinth: false });
+  stupa.scale.setScalar(1.5);
+  stupa.position.set(0, 0, -6.2);
+  g.add(stupa);
+  // smaller stupas on either side, as on the Shwedagon platform
+  for (const sx of [-1, 1]) for (const [x, z, s] of [[4.2, -5.0, 0.5], [6.4, -6.6, 0.4]]) {
+    const small = buildStupa(m, { plinth: false });
+    small.scale.setScalar(s); small.position.set(sx * x, 0, z);
+    g.add(small);
+  }
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(22, 9), new THREE.MeshStandardMaterial({ color: 0xcfc6b2, roughness: 0.7 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.13, -5.5);
+  g.add(ground);
+  g.userData.stupa = stupa;
   return g;
 }
 
 // A few flower petals for the bowl: jasmine and a pink one
-export function addFlowers(shrine, n = 5) {
-  const ud = shrine.userData;
+export function addFlowers(corner, n = 6) {
+  const ud = corner.userData;
   const cols = [0xffffff, 0xfff3d6, 0xffc2d4, 0xffffff];
   for (let i = 0; i < n; i++) {
     const f = new THREE.Mesh(
-      new THREE.SphereGeometry(0.018 + Math.random() * 0.01, 10, 8),
+      new THREE.SphereGeometry(0.05 + Math.random() * 0.025, 10, 8),
       new THREE.MeshStandardMaterial({ color: cols[(Math.random() * cols.length) | 0], roughness: 0.6 }));
-    const a = Math.random() * Math.PI * 2, r = Math.random() * 0.055;
-    f.position.set(ud.bowl.position.x + Math.cos(a) * r, 0.09 + ud.flowers.length * 0.004, ud.bowl.position.z + Math.sin(a) * r);
-    f.scale.y = 0.55;
-    shrine.add(f);
+    const a = Math.random() * Math.PI * 2, r = Math.random() * 0.13;
+    f.position.set(ud.bowlPos.x + Math.cos(a) * r, ud.bowlPos.y + 0.12 + ud.flowers.length * 0.006, ud.bowlPos.z + Math.sin(a) * r);
+    f.scale.y = 0.6;
+    corner.add(f);
     ud.flowers.push(f);
   }
 }
