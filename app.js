@@ -21,6 +21,7 @@ const lctx = layer.getContext("2d");
 const shade = document.createElement("canvas");
 const sctx = shade.getContext("2d");
 const stage = $("#stage");
+const appEl = $(".app");
 
 const state = {
   shape: "circle",
@@ -28,18 +29,48 @@ const state = {
   strength: 0.85,
   extras: { forehead: false, nose: false, chin: false },
   mode: null,          // "camera" | "photo"
-  photo: null,         // HTMLImageElement in photo mode
+  photo: null,         // canvas holding the chosen photo
   points: null,        // smoothed landmarks (pixels)
+  facing: "user",      // "user" (front) | "environment" (back)
+  mirror: true,        // front camera is shown mirrored
 };
 
 let landmarker = null;
+let landmarkerPromise = null;
 let runningMode = null;
 let stream = null;
 let lastVideoTime = -1;
+let loopRunning = false;
 
 // ---------- UI ----------
+// Radio groups: one tab stop, arrow keys move the choice
+function selectRadio(wrap, chosen) {
+  wrap.querySelectorAll('[role="radio"]').forEach((x) => {
+    const on = x === chosen;
+    x.setAttribute("aria-checked", String(on));
+    x.tabIndex = on ? 0 : -1;
+  });
+}
+
+function enableRadioKeys(wrap) {
+  wrap.addEventListener("keydown", (e) => {
+    const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"];
+    if (!keys.includes(e.key)) return;
+    const items = [...wrap.querySelectorAll('[role="radio"]')];
+    let i = items.findIndex((x) => x.getAttribute("aria-checked") === "true");
+    if (e.key === "Home") i = 0;
+    else if (e.key === "End") i = items.length - 1;
+    else i = (i + (e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    e.preventDefault();
+    items[i].click();
+    // the group may be rebuilt on click, so look the item up again
+    (wrap.querySelectorAll('[role="radio"]')[i] || items[i]).focus();
+  });
+}
+
 function buildShapePicker() {
   const wrap = $("#shapes");
+  const hadFocus = wrap.contains(document.activeElement);
   wrap.innerHTML = "";
   for (const s of SHAPES) {
     const b = document.createElement("button");
@@ -47,6 +78,7 @@ function buildShapePicker() {
     b.setAttribute("role", "radio");
     b.dataset.shape = s.id;
     b.setAttribute("aria-checked", String(s.id === state.shape));
+    b.tabIndex = s.id === state.shape ? 0 : -1;
     const c = document.createElement("canvas");
     c.width = c.height = 116;
     drawShapeIcon(c, s.id, state.tone);
@@ -54,11 +86,13 @@ function buildShapePicker() {
     b.insertAdjacentHTML("beforeend", `<span class="mm">${s.mm}</span>`);
     b.onclick = () => {
       state.shape = s.id;
-      wrap.querySelectorAll(".shape").forEach(x => x.setAttribute("aria-checked", String(x === b)));
+      selectRadio(wrap, b);
+      b.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
       redraw();
     };
     wrap.append(b);
   }
+  if (hadFocus) wrap.querySelector('[aria-checked="true"]')?.focus();
 }
 
 function buildTones() {
@@ -70,10 +104,11 @@ function buildTones() {
     b.setAttribute("aria-label", t.label);
     b.setAttribute("role", "radio");
     b.setAttribute("aria-checked", String(t.id === state.tone));
-    b.style.background = `rgb(${t.base.join(",")})`;
+    b.tabIndex = t.id === state.tone ? 0 : -1;
+    b.style.setProperty("--c", `rgb(${t.base.join(",")})`);
     b.onclick = () => {
       state.tone = t.id;
-      wrap.querySelectorAll(".tone").forEach(x => x.setAttribute("aria-checked", String(x === b)));
+      selectRadio(wrap, b);
       buildShapePicker();
       redraw();
     };
@@ -103,22 +138,33 @@ function toast(msg, ms = 0) {
 }
 
 // ---------- face tracking ----------
+// Loaded once, and started in the background as soon as the page opens,
+// so it is usually ready by the time someone taps "open camera".
+function ensureLandmarker() {
+  if (!landmarkerPromise) {
+    landmarkerPromise = (async () => {
+      const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
+      const opts = (delegate) => ({
+        baseOptions: { modelAssetPath: MODEL_URL, delegate },
+        runningMode: "VIDEO",
+        numFaces: 1,
+      });
+      try {
+        landmarker = await FaceLandmarker.createFromOptions(fileset, opts("GPU"));
+      } catch {
+        landmarker = await FaceLandmarker.createFromOptions(fileset, opts("CPU"));
+      }
+      runningMode = "VIDEO";
+      return landmarker;
+    })().catch((e) => { landmarkerPromise = null; throw e; });
+  }
+  return landmarkerPromise;
+}
+
 async function getLandmarker(mode) {
   if (!landmarker) {
     toast("မျက်နှာရှာစနစ် ပြင်ဆင်နေပါတယ်…");
-    const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
-    const opts = (delegate) => ({
-      baseOptions: { modelAssetPath: MODEL_URL, delegate },
-      runningMode: mode,
-      numFaces: 1,
-    });
-    try {
-      landmarker = await FaceLandmarker.createFromOptions(fileset, opts("GPU"));
-    } catch {
-      landmarker = await FaceLandmarker.createFromOptions(fileset, opts("CPU"));
-    }
-    runningMode = mode;
-    toast("");
+    try { await ensureLandmarker(); } finally { toast(""); }
   }
   if (runningMode !== mode) {
     await landmarker.setOptions({ runningMode: mode });
@@ -126,6 +172,8 @@ async function getLandmarker(mode) {
   }
   return landmarker;
 }
+
+const TRACKER_ERROR = "မျက်နှာရှာစနစ် မရရှိပါ။ အင်တာနက်စစ်ပြီး ထပ်ကြိုးစားပါ။";
 
 function toPixels(lms, w, h, mirror) {
   return lms.map(l => ({ x: (mirror ? 1 - l.x : l.x) * w, y: l.y * h }));
@@ -223,47 +271,92 @@ function redraw() {
 
 let missed = 0;
 function cameraLoop() {
-  if (state.mode !== "camera") return;
+  if (state.mode !== "camera") { loopRunning = false; return; }
   if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
     sizeCanvases(video.videoWidth, video.videoHeight);
     const res = landmarker.detectForVideo(video, performance.now());
     const lms = res.faceLandmarks && res.faceLandmarks[0];
     if (lms) {
-      state.points = smooth(toPixels(lms, view.width, view.height, true));
+      state.points = smooth(toPixels(lms, view.width, view.height, state.mirror));
       if (missed > 10) toast("");
       missed = 0;
     } else if (++missed > 10) {
       state.points = null;
       toast("မျက်နှာ မမြင်ရပါ၊ အလင်းရောင်ရှိတဲ့နေရာ ရွှေ့ပါ");
     }
-    compose(video, true);
+    compose(video, state.mirror);
   }
   requestAnimationFrame(cameraLoop);
 }
 
 // ---------- modes ----------
-async function startCamera() {
-  try {
-    stopCamera();
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 960 } },
-      audio: false,
-    });
-  } catch (err) {
-    toast(location.protocol === "https:" || location.hostname === "localhost"
-      ? "ကင်မရာကို ပိတ်ထားပါတယ်။ ခွင့်ပြုပြီး ထပ်ကြိုးစားပါ။"
-      : "ကင်မရာသုံးဖို့ လုံခြုံတဲ့လင့်ခ် လိုပါတယ်။", 5000);
+function cameraErrorMessage(err) {
+  if (!window.isSecureContext || !navigator.mediaDevices) return "ကင်မရာသုံးဖို့ လုံခြုံတဲ့လင့်ခ် လိုပါတယ်။";
+  switch (err && err.name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return "ကင်မရာကို ခွင့်မပြုထားပါ။ ခွင့်ပြုပြီး “ကင်မရာဖွင့်မယ်” ကို ထပ်နှိပ်ပါ။";
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return "ကင်မရာ မတွေ့ပါ။ “ဓာတ်ပုံရွေးမယ်” ကို သုံးကြည့်ပါ။";
+    case "NotReadableError":
+      return "တခြားအက်ပ်က ကင်မရာကို သုံးနေပါတယ်။ ပိတ်ပြီး ထပ်ကြိုးစားပါ။";
+    default:
+      return "ကင်မရာ မဖွင့်နိုင်ပါ။ ထပ်ကြိုးစားပါ။";
+  }
+}
+
+function openStream(facing) {
+  return navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 960 } },
+    audio: false,
+  });
+}
+
+async function attachStream(s, requested) {
+  stream = s;
+  const settings = (s.getVideoTracks()[0] && s.getVideoTracks()[0].getSettings()) || {};
+  state.facing = settings.facingMode || requested;
+  state.mirror = state.facing !== "environment";
+  video.srcObject = s;
+  await video.play().catch(() => {});
+}
+
+async function startCamera(facing = "user") {
+  const flipping = state.mode === "camera";
+  const before = state.facing;
+  toast("");
+  stopCamera();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast(cameraErrorMessage());
     return;
   }
-  video.srcObject = stream;
-  await video.play().catch(() => {});
-  await getLandmarker("VIDEO");
+  try {
+    await attachStream(await openStream(facing), facing);
+  } catch (err) {
+    if (flipping) {
+      // couldn't switch: go back to the camera we had
+      try { await attachStream(await openStream(before), before); } catch {}
+      toast("ကင်မရာ ပြောင်းမရပါ", 4000);
+    } else {
+      toast(cameraErrorMessage(err));   // stays on screen until the next try
+    }
+    return;
+  }
+  try {
+    await getLandmarker("VIDEO");
+  } catch {
+    stopCamera();
+    toast(TRACKER_ERROR);
+    return;
+  }
   state.mode = "camera";
   state.points = null;
   stage.classList.remove("photo");
   enterApp();
-  requestAnimationFrame(cameraLoop);
+  updateFlipButton();
+  if (!loopRunning) { loopRunning = true; requestAnimationFrame(cameraLoop); }
 }
 
 function stopCamera() {
@@ -271,9 +364,20 @@ function stopCamera() {
   stream = null;
 }
 
+// Only offer the switch when the phone really has more than one camera
+async function updateFlipButton() {
+  let many = false;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    many = devices.filter((d) => d.kind === "videoinput").length > 1;
+  } catch {}
+  $("#btnFlip").hidden = !(many && state.mode === "camera");
+}
+
 async function startPhoto(src) {
   stopCamera();
   state.mode = "photo";
+  toast("");
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = src;
@@ -290,9 +394,11 @@ async function startPhoto(src) {
   stage.classList.add("photo");
   state.points = null;
   enterApp();
+  $("#btnFlip").hidden = true;
   redraw();
 
-  const lm = await getLandmarker("IMAGE");
+  let lm;
+  try { lm = await getLandmarker("IMAGE"); } catch { toast(TRACKER_ERROR); return; }
   const res = lm.detect(sized);
   const lms = res.faceLandmarks && res.faceLandmarks[0];
   state.points = lms ? toPixels(lms, view.width, view.height, false) : null;
@@ -301,13 +407,14 @@ async function startPhoto(src) {
 }
 
 function enterApp() {
-  document.querySelector(".app").classList.add("started");
+  appEl.classList.add("started");
   $("#intro").hidden = true;
   $("#btnShutter").disabled = false;
   $("#btnSwitch").hidden = false;
 }
 
-$("#btnCamera").onclick = startCamera;
+$("#btnCamera").onclick = () => startCamera("user");
+$("#btnFlip").onclick = () => startCamera(state.facing === "user" ? "environment" : "user");
 $("#filePhoto").onchange = (e) => {
   const f = e.target.files && e.target.files[0];
   if (f) startPhoto(URL.createObjectURL(f));
@@ -316,14 +423,43 @@ $("#filePhoto").onchange = (e) => {
 $("#btnSwitch").onclick = () => {
   stopCamera();
   state.mode = null;
-  document.querySelector(".app").classList.remove("started");
+  appEl.classList.remove("started");
   $("#intro").hidden = false;
   $("#btnShutter").disabled = true;
+  $("#btnFlip").hidden = true;
+  toast("");
+  $("#btnCamera").focus();
 };
 
 // ---------- capture & share ----------
 let lastBlob = null;
 let lastUrl = null;
+const resultEl = $("#result");
+let returnFocusTo = null;
+
+function openResult() {
+  returnFocusTo = document.activeElement;
+  appEl.inert = true;          // keep keyboard and screen-reader focus inside the popup
+  resultEl.hidden = false;
+  $("#btnShare").focus();
+}
+
+function closeResult() {
+  resultEl.hidden = true;
+  appEl.inert = false;
+  const back = returnFocusTo && document.contains(returnFocusTo) ? returnFocusTo : $("#btnShutter");
+  back.focus();
+}
+
+resultEl.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closeResult(); return; }
+  if (e.key !== "Tab") return;
+  const items = [...resultEl.querySelectorAll("button, a.btn")];
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+resultEl.addEventListener("click", (e) => { if (e.target === resultEl) closeResult(); });
 
 $("#btnShutter").onclick = () => {
   const out = document.createElement("canvas");
@@ -354,11 +490,11 @@ $("#btnShutter").onclick = () => {
     lastUrl = URL.createObjectURL(blob);
     $("#resultImg").src = lastUrl;
     $("#btnSave").href = lastUrl;
-    $("#result").hidden = false;
+    openResult();
   }, "image/jpeg", 0.92);
 };
 
-$("#btnBack").onclick = () => { $("#result").hidden = true; };
+$("#btnBack").onclick = closeResult;
 $("#btnShare").onclick = async () => {
   if (!lastBlob) return;
   const file = new File([lastBlob], "pocket-myanmar-thanakha.jpg", { type: "image/jpeg" });
@@ -372,6 +508,15 @@ $("#btnShare").onclick = async () => {
 // ---------- boot ----------
 buildShapePicker();
 buildTones();
+enableRadioKeys($("#shapes"));
+enableRadioKeys($("#tones"));
+
+// Start fetching the face tracker right away (skipped when the phone asks to save data)
+if (!(navigator.connection && navigator.connection.saveData)) {
+  const warm = () => ensureLandmarker().catch(() => {});
+  if ("requestIdleCallback" in window) requestIdleCallback(warm, { timeout: 4000 });
+  else setTimeout(warm, 2000);
+}
 
 // Testing helper: ?img=<url> opens a photo straight away
 const testImg = new URLSearchParams(location.search).get("img");

@@ -33,5 +33,7 @@ Phones only allow camera access on **https** links. Host the folder on any stati
 - `index.html`, `style.css`: page layout
 - `app.js`: camera, face tracking, photo capture and sharing
 - `thanakha.js`: thanakha shapes, paste texture and how they're placed on the face
+- `blend.js`: WebGL shader that blends the paste into the skin using its light and shadow
+- `logo.svg`: logo, also used as the browser tab icon
 
 To add a new shape, add an entry to `SHAPES` and a `case` in `cheekShape()` in `thanakha.js`. Shapes are drawn in face-local units, where `u` points outward from the nose and `v` points down.
