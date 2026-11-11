@@ -58,7 +58,7 @@ button { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--hair);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
 }
-.brand { display: flex; align-items: center; gap: 9px; }
+.brand { display: flex; align-items: center; gap: 9px; min-width: 0; white-space: nowrap; }
 .brand-logo { width: 32px; height: 32px; border-radius: 9px; box-shadow: 0 0 0 1px var(--ring), 0 4px 10px rgba(0,0,0,.5); }
 .gold-text {
   background: linear-gradient(180deg, #fff0c2, var(--gold) 58%, var(--gold-lo));
@@ -66,7 +66,7 @@ button { font: inherit; color: inherit; }
   -webkit-text-fill-color: transparent; color: var(--gold);
 }
 .brand-en {
-  font-family: "Playfair Display", Georgia, serif; font-weight: 700; font-size: 20px; line-height: 1.4; letter-spacing: 0.01em;
+  font-family: "Playfair Display", Georgia, serif; font-weight: 700; font-size: clamp(16px, 5.2vw, 20px); line-height: 1.4; letter-spacing: 0.01em;
   background: linear-gradient(180deg, #fff0c2, var(--gold) 58%, var(--gold-lo));
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: var(--gold);
@@ -91,7 +91,7 @@ button { font: inherit; color: inherit; }
 .stage.photo #view { object-fit: contain; }
 
 .intro {
-  position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; padding: 16px;
+  position: absolute; inset: 0; z-index: 3; display: flex; overflow-y: auto; padding: 16px;
   background:
     radial-gradient(75% 48% at 50% 26%, rgba(200, 56, 92, 0.5), transparent 72%),
     linear-gradient(115deg, transparent 30%, rgba(255, 160, 180, 0.06) 46%, transparent 62%),
@@ -103,7 +103,8 @@ button { font: inherit; color: inherit; }
 }
 .intro-card { position: relative; }
 .intro[hidden] { display: none; }
-.intro-card { text-align: center; max-width: 340px; display: grid; gap: 12px; justify-items: center; }
+/* margin:auto centres the card when it fits, and lets it scroll from the top when it doesn't */
+.intro-card { text-align: center; max-width: 340px; width: 100%; margin: auto; display: grid; gap: 12px; justify-items: center; }
 .intro-logo {
   width: 120px; height: 120px; border-radius: 28px;
   box-shadow: 0 0 0 1px var(--ring), 0 0 0 7px rgba(227, 184, 92, 0.08),
@@ -158,10 +159,10 @@ button { font: inherit; color: inherit; }
   padding: 14px 0 calc(env(safe-area-inset-bottom) + 12px);
   display: grid; gap: 10px;
 }
-.row { padding: 0 16px; }
+.row { padding: 0 16px; min-width: 0; }
 .shapes {
   display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none;
-  scroll-snap-type: x proximity; padding: 8px 6px 4px; margin: -6px -6px 0;
+  scroll-snap-type: x proximity; padding: 10px 16px 6px; margin: -8px 0 -2px;
 }
 .shapes::-webkit-scrollbar { display: none; }
 .shape {
@@ -200,9 +201,10 @@ button { font: inherit; color: inherit; }
 }
 .tone[aria-checked="true"] { border-color: var(--gold-hi); box-shadow: 0 0 0 3px rgba(227, 184, 92, 0.28), 0 3px 8px rgba(0, 0, 0, 0.45); }
 
-.strength { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 160px; color: var(--muted); font-size: 13px; }
+.strength { display: flex; align-items: center; gap: 10px; flex: 1 1 150px; min-width: 0; color: var(--muted); font-size: 13px; }
+.strength span { white-space: nowrap; }
 .strength input {
-  flex: 1; height: 28px; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer;
+  flex: 1; min-width: 0; width: 100%; height: 28px; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer;
 }
 .strength input::-webkit-slider-runnable-track {
   height: 4px; border-radius: 4px;
@@ -220,9 +222,15 @@ button { font: inherit; color: inherit; }
   box-shadow: 0 0 0 1px var(--gold-hi), 0 3px 8px rgba(0, 0, 0, 0.6);
 }
 
-.shutter-row { display: grid; place-items: center; }
+/* shutter floats over the picture, like a camera app, so the panel stays short */
+.shutter-row {
+  position: absolute; left: 0; right: 0; bottom: 14px; z-index: 4;
+  display: grid; place-items: center; pointer-events: none;
+}
+.shutter { pointer-events: auto; }
+.app:not(.started) .panel, .app:not(.started) .shutter-row { display: none; }
 .shutter {
-  width: 74px; height: 74px; border-radius: 50%; padding: 5px; cursor: pointer;
+  width: 68px; height: 68px; border-radius: 50%; padding: 5px; cursor: pointer;
   border: 2px solid var(--gold-hi); background: rgba(10, 0, 5, 0.35);
   box-shadow: 0 0 0 6px rgba(227, 184, 92, 0.12), 0 10px 26px rgba(0, 0, 0, 0.55);
 }
@@ -251,3 +259,48 @@ button { font: inherit; color: inherit; }
 }
 .sheet-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
 .sheet-actions .btn { min-width: 0; padding: 8px; font-size: 15px; }
+
+/* ---------- Small screens ---------- */
+/* narrow phones: drop the secondary label so the header never collides with the button */
+@media (max-width: 359px) {
+  .brand-mm { display: none; }
+  .row, .shapes { padding-left: 12px; padding-right: 12px; }
+  .btn { min-width: 0; width: 100%; }
+}
+/* short phones */
+@media (max-height: 700px) {
+  .intro { padding: 10px 16px; }
+  .intro-card { gap: 8px; }
+  .intro-logo { width: 92px; height: 92px; border-radius: 22px; }
+  .intro h1 { font-size: 21px; line-height: 1.8; }
+  .btn { min-height: 46px; }
+  .panel { gap: 6px; padding-top: 10px; }
+  .shape canvas { width: 50px; height: 50px; }
+  .shape .mm { font-size: 12.5px; line-height: 1.6; }
+  .pill { min-height: 36px; padding: 4px 14px; }
+  .shutter { width: 60px; height: 60px; }
+}
+@media (max-height: 580px) {
+  .intro-logo { width: 68px; height: 68px; border-radius: 17px; }
+  .intro .fine { font-size: 12px; }
+}
+/* phones held sideways: picture on the left, controls on the right */
+@media (orientation: landscape) and (max-height: 520px) {
+  .app { max-width: none; grid-template-columns: minmax(0, 1fr) minmax(250px, 340px); grid-template-rows: auto minmax(0, 1fr); }
+  .topbar { grid-column: 1 / -1; padding-top: 6px; padding-bottom: 6px; }
+  .stage { grid-column: 1; grid-row: 2; }
+  .app:not(.started) .stage { grid-column: 1 / -1; }
+  .panel {
+    grid-column: 2; grid-row: 2; align-content: start; overflow-y: auto;
+    border-radius: 22px 0 0 0; border-top: 0; border-left: 1px solid var(--ring);
+    padding: 12px 0 calc(env(safe-area-inset-bottom) + 10px);
+  }
+  .intro-card {
+    max-width: 620px; grid-template-columns: auto minmax(0, 1fr); column-gap: 22px; row-gap: 6px;
+    text-align: left; justify-items: stretch; align-items: center;
+  }
+  .intro-card > * { grid-column: 2; }
+  .intro-card > .intro-logo { grid-column: 1; grid-row: 1 / span 6; width: 96px; height: 96px; border-radius: 22px; }
+  .intro .btn { width: 100%; min-width: 0; min-height: 42px; }
+  .sheet-card img { max-height: 58dvh; }
+}

@@ -301,6 +301,7 @@ async function startPhoto(src) {
 }
 
 function enterApp() {
+  document.querySelector(".app").classList.add("started");
   $("#intro").hidden = true;
   $("#btnShutter").disabled = false;
   $("#btnSwitch").hidden = false;
@@ -315,6 +316,7 @@ $("#filePhoto").onchange = (e) => {
 $("#btnSwitch").onclick = () => {
   stopCamera();
   state.mode = null;
+  document.querySelector(".app").classList.remove("started");
   $("#intro").hidden = false;
   $("#btnShutter").disabled = true;
 };
