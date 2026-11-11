@@ -16,6 +16,17 @@ A face filter that paints Myanmar thanakha on your face through the phone camera
 
 Face tracking uses Google MediaPipe Face Landmarker and runs entirely on the device. Nothing is uploaded.
 
+## Feature 2: Pagoda at Home (ဘုရားဖူး)
+
+Open `pagoda.html` (linked from the start screen). A golden Shwedagon-style pagoda appears over the rear camera, and you worship at the shrine for the weekday you were born on.
+
+- **Place it:** pick your birth day (Wednesday morning and Rahu are separate), tap a table or shelf, and the pagoda stays there as you move the phone (it uses the phone's motion sensors; there is no surface detection, so it holds its direction but not its position if you walk). Pinch or use the slider to change its size; drag to turn it.
+- **Worship:** pour water over the Buddha image, light the lamps, offer flowers and ring the bell. Doing all four gives "သာဓု သာဓု သာဓု". A small merit count and day streak are kept on the phone only.
+- **Lighting** follows the time in Yangon (morning, day, evening, night).
+- **Photo:** a share card with the scene, your weekday animal and merit count.
+- Everything is drawn in code (no model files) with three.js, and the sounds are made with the Web Audio API.
+- Respect: the page asks people to place it on a table or shelf, never on the ground.
+
 ## Run locally
 
 ```bash
@@ -40,6 +51,7 @@ Phones only allow camera access on **https** links. Host the folder on any stati
 - `mesh.js`, `facemesh.js`, `facemap.js`: the paste is painted once on a flat picture of the face and wrapped onto a 3D face mesh (MediaPipe's canonical face model, Apache 2.0) fitted to each tracked face every frame, the way phone face filters work. Add `?mesh=0` to the address to use the older flat drawing instead.
 - `occlude.js`: finds what sits in front of the face so the paste stays under it. Hair comes from MediaPipe's small hair model (under 1 MB): a fringe or loose strands over the forehead and temples. Only the area above the eye line is used, because the model mistakes shadowed jaw and ear skin for hair. Hands come from MediaPipe's hand landmarks (about 8 MB), drawn as a palm-and-fingers shape. Both load in the background after the face tracker, and the hand model is skipped on data-saver and slow connections.
 - `blend.js`: WebGL shader that blends the paste into the skin using its light and shadow
+- `pagoda.html`, `pagoda.css`, `pagoda.js`, `pagoda-model.js`: the pagoda feature (page, scene and interaction, and the 3D shapes). Add `?debug` to the address to expose `window.__pagoda` for testing.
 - `logo.svg`: logo, also used as the browser tab icon
 
 To add a new shape, add an entry to `SHAPES` and a `case` in `cheekShape()` in `thanakha.js`. Shapes are drawn in face-local units, where `u` points outward from the nose and `v` points down.
