@@ -218,22 +218,35 @@ function smoothFaces(nextList) {
     if (best < 0 || bestD > faceWidth(next) * 0.8) return next;
     const prev = free.splice(best, 1)[0];
     const out = smooth(next, prev);
-    out.meta = prev.meta;
+    out.meta = prev.meta || {};
+    out.meta.filt = out.filt;      // filter state travels with the face
     return out;
   });
 }
 
-// Smooth out jitter; follow fast moves quickly, steady when still
+// One Euro filter per landmark: very steady when the head is still, follows fast moves with
+// almost no lag. The cutoff rises with the point's speed (measured in face widths per second),
+// and the blend uses the real time between frames, so it behaves the same at 15 or 60 fps.
+const OE = { minCut: 1.0, beta: 20, dCut: 1 };
+const oeAlpha = (cut, dt) => 1 / (1 + 1 / (2 * Math.PI * cut) / dt);
+
 function smooth(next, prev) {
   if (!prev || prev.length !== next.length) return next;
+  const now = performance.now();
+  const f = prev.meta && prev.meta.filt;
+  const dt = f ? Math.min(0.1, Math.max(1 / 120, (now - f.t) / 1000)) : 1 / 30;
   const faceW = Math.hypot(next[234].x - next[454].x, next[234].y - next[454].y) || 1;
-  const move = Math.hypot(next[1].x - prev[1].x, next[1].y - prev[1].y) / faceW;
-  const a = Math.min(1, 0.35 + move * 8);
-  return next.map((p, i) => ({
-    x: prev[i].x + (p.x - prev[i].x) * a,
-    y: prev[i].y + (p.y - prev[i].y) * a,
-    z: prev[i].z + (p.z - prev[i].z) * a,
-  }));
+  const dx = f ? f.dx : new Float32Array(next.length * 3);
+  const aD = oeAlpha(OE.dCut, dt);
+  const out = next.map((p, i) => {
+    const q = prev[i], o = 3 * i;
+    const vx = (p.x - q.x) / dt / faceW, vy = (p.y - q.y) / dt / faceW, vz = (p.z - q.z) / dt / faceW;
+    dx[o] += (vx - dx[o]) * aD; dx[o + 1] += (vy - dx[o + 1]) * aD; dx[o + 2] += (vz - dx[o + 2]) * aD;
+    const a = oeAlpha(OE.minCut + OE.beta * Math.hypot(dx[o], dx[o + 1], dx[o + 2]), dt);
+    return { x: q.x + (p.x - q.x) * a, y: q.y + (p.y - q.y) * a, z: q.z + (p.z - q.z) * a };
+  });
+  out.filt = { t: now, dx };
+  return out;
 }
 
 // ---------- rendering ----------
