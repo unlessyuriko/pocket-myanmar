@@ -476,7 +476,7 @@ $("#btnShutter").onclick = () => {
   // Small caption in the corner
   const fs = Math.round(out.width * 0.032);
   o.font = `600 ${fs}px "Noto Sans Myanmar", "Myanmar Text", sans-serif`;
-  const text = "Pocket Myanmar · သနပ်ခါး";
+  const text = "Myanmar Vibe · သနပ်ခါး";
   const pad = fs * 0.6;
   const tw = o.measureText(text).width;
   o.fillStyle = "rgba(27,20,16,0.55)";
@@ -502,9 +502,9 @@ $("#btnShutter").onclick = () => {
 $("#btnBack").onclick = closeResult;
 $("#btnShare").onclick = async () => {
   if (!lastBlob) return;
-  const file = new File([lastBlob], "pocket-myanmar-thanakha.jpg", { type: "image/jpeg" });
+  const file = new File([lastBlob], "myanmar-vibe-thanakha.jpg", { type: "image/jpeg" });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: "Pocket Myanmar", text: "သနပ်ခါး လိမ်းထားတယ် 🌼" }); } catch {}
+    try { await navigator.share({ files: [file], title: "Myanmar Vibe", text: "သနပ်ခါး လိမ်းထားတယ် 🌼" }); } catch {}
   } else {
     $("#btnSave").click();
   }
