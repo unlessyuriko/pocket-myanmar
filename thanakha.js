@@ -165,6 +165,22 @@ function withLayer(ctx, alpha, draw) {
   ctx.restore();
 }
 
+// Face outline path, with the top lifted to cover the whole forehead
+// (the landmark outline stops partway up the forehead, below the hairline)
+function faceOutline(ctx, P, scale) {
+  const c = centroid(P, FACE_OVAL);
+  const d = sub(P[152], P[10]);
+  const H2 = d.x * d.x + d.y * d.y || 1;
+  FACE_OVAL.forEach((i, k) => {
+    const p = lerp(c, P[i], scale);
+    const t = ((P[i].x - P[10].x) * d.x + (P[i].y - P[10].y) * d.y) / H2;   // 0 = top, 1 = chin
+    const w = 1 - smoothstep(0, 0.4, t);
+    const q = { x: p.x - d.x * 0.24 * w, y: p.y - d.y * 0.24 * w };
+    k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y);
+  });
+  ctx.closePath();
+}
+
 // Put the canvas into a face-local space: origin O, axes U (outward) and V (down)
 function frame(ctx, O, U, V) {
   ctx.setTransform(U.x, U.y, V.x, V.y, O.x, O.y);
@@ -306,7 +322,7 @@ export function drawThanakha(ctx, P, opts) {
 
   if (opts.shape === "full") {
     ctx.beginPath();
-    polygon(ctx, P, FACE_OVAL, 0.95);
+    faceOutline(ctx, P, 0.97);
     ctx.globalAlpha = 0.82;   // full-face wash is usually a thinner layer
     ctx.fillStyle = pattern;
     if (pattern.setTransform) pattern.setTransform(new DOMMatrix([faceW / 600, 0, 0, faceW / 600, 0, 0]));
@@ -367,7 +383,7 @@ export function drawThanakha(ctx, P, opts) {
   ctx.globalCompositeOperation = "destination-in";
   ctx.fillStyle = "#000";
   ctx.beginPath();
-  polygon(ctx, P, FACE_OVAL, 0.97);
+  faceOutline(ctx, P, 0.98);
   ctx.fill();
 
   ctx.restore();
