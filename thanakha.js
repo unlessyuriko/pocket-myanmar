@@ -304,7 +304,28 @@ function cheekShape(ctx, shape, pattern) {
 
 // ---------- main entry ----------
 // P: landmarks in pixel space. opts: { shape, tone, extras: {forehead, nose, chin} }
-export function drawThanakha(ctx, P, opts) {
+// faces: a list of landmark sets (one per person). Each face is painted on its own layer
+// so one person's edge-trimming never erases another's paste.
+let faceLayer = null;
+export function drawThanakha(ctx, faces, opts) {
+  const list = Array.isArray(faces) ? faces : (faces ? [faces] : []);
+  if (list.length <= 1) { drawFace(ctx, list[0] || null, opts); return; }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.restore();
+  if (!faceLayer) faceLayer = document.createElement("canvas");
+  if (faceLayer.width !== ctx.canvas.width || faceLayer.height !== ctx.canvas.height) {
+    faceLayer.width = ctx.canvas.width; faceLayer.height = ctx.canvas.height;
+  }
+  const fctx = faceLayer.getContext("2d");
+  for (const P of list) {
+    drawFace(fctx, P, opts);
+    ctx.drawImage(faceLayer, 0, 0);
+  }
+}
+
+function drawFace(ctx, P, opts) {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);

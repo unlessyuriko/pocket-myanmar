@@ -30,6 +30,7 @@ const state = {
   extras: { forehead: false, nose: false, chin: false },
   mode: null,          // "camera" | "photo"
   photo: null,         // canvas holding the chosen photo
+  faces: [],           // every tracked face
   points: null,        // smoothed landmarks (pixels)
   facing: "user",      // "user" (front) | "environment" (back)
   mirror: true,        // front camera is shown mirrored
@@ -147,7 +148,7 @@ function ensureLandmarker() {
       const opts = (delegate) => ({
         baseOptions: { modelAssetPath: MODEL_URL, delegate },
         runningMode: "VIDEO",
-        numFaces: 1,
+        numFaces: MAX_FACES,
       });
       try {
         landmarker = await FaceLandmarker.createFromOptions(fileset, opts("GPU"));
@@ -173,6 +174,8 @@ async function getLandmarker(mode) {
   return landmarker;
 }
 
+const MAX_FACES = 4;   // how many people can wear thanakha at once
+
 const TRACKER_ERROR = "မျက်နှာရှာစနစ် မရရှိပါ။ အင်တာနက်စစ်ပြီး ထပ်ကြိုးစားပါ။";
 
 function toPixels(lms, w, h, mirror) {
@@ -180,9 +183,30 @@ function toPixels(lms, w, h, mirror) {
   return lms.map(l => ({ x: (mirror ? 1 - l.x : l.x) * w, y: l.y * h, z: (l.z || 0) * w }));
 }
 
+// Keep the list of tracked faces; state.points is the biggest one (used for the light reading)
+function setFaces(list) {
+  list.sort((a, b) => faceWidth(b) - faceWidth(a));
+  state.faces = list;
+  state.points = list[0] || null;
+}
+const faceWidth = (P) => Math.hypot(P[234].x - P[454].x, P[234].y - P[454].y);
+
+// Smooth every face against the same person in the last frame (matched by nearest nose)
+function smoothFaces(nextList) {
+  const free = (state.faces || []).slice();
+  return nextList.map((next) => {
+    let best = -1, bestD = Infinity;
+    free.forEach((p, i) => {
+      const d = Math.hypot(p[1].x - next[1].x, p[1].y - next[1].y);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    if (best < 0 || bestD > faceWidth(next) * 0.8) return next;
+    return smooth(next, free.splice(best, 1)[0]);
+  });
+}
+
 // Smooth out jitter; follow fast moves quickly, steady when still
-function smooth(next) {
-  const prev = state.points;
+function smooth(next, prev) {
   if (!prev || prev.length !== next.length) return next;
   const faceW = Math.hypot(next[234].x - next[454].x, next[234].y - next[454].y) || 1;
   const move = Math.hypot(next[1].x - prev[1].x, next[1].y - prev[1].y) / faceW;
@@ -233,7 +257,7 @@ function measureFace(source, mirror) {
 function compose(source, mirror) {
   const W = view.width, H = view.height;
   if (blender) {
-    drawThanakha(lctx, state.points, state);
+    drawThanakha(lctx, state.faces, state);
     measureFace(source, mirror);
     blender.render(source, layer, { mirror, strength: state.points ? state.strength : 0, faceLum });
     return;
@@ -243,7 +267,7 @@ function compose(source, mirror) {
   ctx.drawImage(source, 0, 0, W, H);
   ctx.restore();
 
-  drawThanakha(lctx, state.points, state);
+  drawThanakha(lctx, state.faces, state);
   if (state.points) {
     ctx.save();
     ctx.globalAlpha = state.strength;
@@ -281,13 +305,13 @@ function cameraLoop() {
     lastVideoTime = video.currentTime;
     sizeCanvases(video.videoWidth, video.videoHeight);
     const res = landmarker.detectForVideo(video, performance.now());
-    const lms = res.faceLandmarks && res.faceLandmarks[0];
-    if (lms) {
-      state.points = smooth(toPixels(lms, view.width, view.height, state.mirror));
+    const found = (res.faceLandmarks || []).map((l) => toPixels(l, view.width, view.height, state.mirror));
+    if (found.length) {
+      setFaces(smoothFaces(found));
       if (missed > 10) toast("");
       missed = 0;
     } else if (++missed > 10) {
-      state.points = null;
+      setFaces([]);
       toast("မျက်နှာ မမြင်ရပါ၊ အလင်းရောင်ရှိတဲ့နေရာ ရွှေ့ပါ");
     }
     compose(video, state.mirror);
@@ -357,7 +381,7 @@ async function startCamera(facing = "user") {
     return;
   }
   state.mode = "camera";
-  state.points = null;
+  setFaces([]);
   stage.classList.remove("photo");
   enterApp();
   updateFlipButton();
@@ -397,7 +421,7 @@ async function startPhoto(src) {
   sized.getContext("2d").drawImage(img, 0, 0, sized.width, sized.height);
   state.photo = sized;
   stage.classList.add("photo");
-  state.points = null;
+  setFaces([]);
   enterApp();
   $("#btnFlip").hidden = true;
   redraw();
@@ -405,9 +429,9 @@ async function startPhoto(src) {
   let lm;
   try { lm = await getLandmarker("IMAGE"); } catch { toast(TRACKER_ERROR); return; }
   const res = lm.detect(sized);
-  const lms = res.faceLandmarks && res.faceLandmarks[0];
-  state.points = lms ? toPixels(lms, view.width, view.height, false) : null;
-  if (!lms) toast("ဒီဓာတ်ပုံထဲမှာ မျက်နှာ မတွေ့ပါ", 4000);
+  const found = (res.faceLandmarks || []).map((l) => toPixels(l, view.width, view.height, false));
+  setFaces(found);
+  if (!found.length) toast("ဒီဓာတ်ပုံထဲမှာ မျက်နှာ မတွေ့ပါ", 4000);
   redraw();
 }
 
