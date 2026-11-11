@@ -142,15 +142,15 @@ function faceW3(P) {
 // nose; turning the head toward that side swings it to face the lens, turning away hides it.
 //   vis:  0 (hidden) to 1 (fully visible)
 //   fore: how squeezed the cheek looks sideways (1 = face-on)
-const CHEEK_ANGLE = 0.96;
+const CHEEK_ANGLE = 0.8;
 function cheekPose(P, edge, other) {
   const e = P[edge], o = P[other];
   const len = Math.hypot(e.x - o.x, e.y - o.y, (e.z || 0) - (o.z || 0)) || 1;
   const turn = Math.asin(clamp(((o.z || 0) - (e.z || 0)) / len, -1, 1));   // + = this side nearer the camera
   const facing = Math.cos(CHEEK_ANGLE - turn);
   return {
-    vis: smoothstep(0.04, 0.3, facing),
-    fore: clamp(facing / Math.cos(CHEEK_ANGLE), 0.2, 1.4),
+    vis: smoothstep(-0.05, 0.2, facing),
+    fore: clamp(facing / Math.cos(CHEEK_ANGLE), 0.3, 1.4),
   };
 }
 
@@ -374,8 +374,20 @@ function drawFace(ctx, P, opts) {
       // real cheek-to-cheek width and squeezed by how side-on this cheek is
       const dir = sub(P[edge], P[other]);
       const len = Math.hypot(dir.x, dir.y) || 1;
-      const U = mul(dir, (0.25 * faceW3(P) * fore) / len);
-      const O = add(lerp(P[cheek], P[edge], 0.12), mul(down, 0.25));
+      let U = mul(dir, (0.25 * faceW3(P) * fore) / len);
+      let O = add(lerp(P[cheek], P[edge], 0.12), mul(down, 0.25));
+      // Keep the patch on the face. When the head is turned, the far cheek is squeezed between the
+      // nose and the face edge (the cheek point can even sit past the edge point), so pull the patch
+      // inward and narrow it to fit, instead of letting the face outline cut it off.
+      const nose = P[195];
+      const uHat = mul(dir, 1 / len);
+      const sEdge = (P[edge].x - nose.x) * uHat.x + (P[edge].y - nose.y) * uHat.y;   // nose to edge, outward
+      const sCheek = (O.x - nose.x) * uHat.x + (O.y - nose.y) * uHat.y;
+      const sMid = Math.min(sCheek, 0.7 * Math.max(sEdge, 0));
+      if (sMid < sCheek) O = add(O, mul(uHat, sMid - sCheek));
+      const room = Math.max(sEdge - sMid, 0);
+      const reach = 0.8 * 0.88 * Math.hypot(U.x, U.y);
+      if (reach > room * 1.25) U = mul(U, Math.max(0.3, (room * 1.25) / reach));
       withLayer(ctx, vis, g => {
         frame(g, O, U, down);
         g.scale(0.88, 0.88);
