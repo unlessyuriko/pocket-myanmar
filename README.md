@@ -10,6 +10,9 @@ A face filter that paints Myanmar thanakha on your face through the phone camera
 - **Extras:** forehead, nose and chin dots, which can be combined with any shape
 - **Tones:** fresh paste, classic, dried; adjustable strength
 - **Photo:** take a selfie with a small caption, then save or share it. You can also use an existing photo instead of the camera.
+- **Video:** record 5 seconds with the effects (MP4 where the browser supports it, otherwise WebM), then save or share.
+- **Group:** up to 4 faces at once, each tracked and painted separately.
+- **Effects:** the paste spreads on when a face appears or the shape changes; a flash and glints on capture; a smile makes glints and petals, an open mouth rains petals, a wink pops a glint. Expressions are read from landmark distances (see `REACT` in `app.js`). Effects are skipped when the phone asks for reduced motion.
 
 Face tracking uses Google MediaPipe Face Landmarker and runs entirely on the device. Nothing is uploaded.
 
@@ -33,6 +36,7 @@ Phones only allow camera access on **https** links. Host the folder on any stati
 - `index.html`, `style.css`: page layout
 - `app.js`: camera, face tracking, photo capture and sharing
 - `thanakha.js`: thanakha shapes, paste texture and how they're placed on the face
+- `fx.js`: sparkles and petals, and smile / wink / open-mouth detection
 - `blend.js`: WebGL shader that blends the paste into the skin using its light and shadow
 - `logo.svg`: logo, also used as the browser tab icon
 

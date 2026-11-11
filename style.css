@@ -87,8 +87,9 @@ button { font: inherit; color: inherit; }
   box-shadow: inset 0 0 70px rgba(2, 14, 10, 0.55), inset 0 0 0 1px var(--hair);
 }
 #video { display: none; }
-#view { width: 100%; height: 100%; display: block; object-fit: cover; }
-.stage.photo #view { object-fit: contain; }
+#view, #fx { width: 100%; height: 100%; display: block; object-fit: cover; }
+#fx { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.stage.photo #view, .stage.photo #fx { object-fit: contain; }
 
 .intro {
   position: absolute; inset: 0; z-index: 3; display: flex; overflow-y: auto; padding: 16px;
@@ -242,7 +243,24 @@ button { font: inherit; color: inherit; }
   background: radial-gradient(circle at 35% 25%, rgba(22, 84, 66, 0.92), rgba(6, 32, 26, 0.95));
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 220, 160, 0.18);
 }
-.flip-btn[hidden] { display: none; }
+.flip-btn[hidden], .rec-btn[hidden] { display: none; }
+.rec-btn {
+  position: absolute; left: 16px; bottom: 18px; pointer-events: auto;
+  width: 48px; height: 48px; border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  border: 1px solid var(--ring); color: var(--gold-hi);
+  background: radial-gradient(circle at 35% 25%, rgba(22, 84, 66, 0.92), rgba(6, 32, 26, 0.95));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 220, 160, 0.18);
+}
+/* while recording: a ring fills up over the 5 seconds */
+.rec-btn::before {
+  content: ""; position: absolute; inset: -5px; border-radius: 50%; opacity: 0;
+  background: conic-gradient(var(--gold-hi) calc(var(--p, 0) * 360deg), rgba(255,255,255,.15) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+}
+.rec-btn.on::before { opacity: 1; }
+.rec-btn.on { color: #ff8a80; border-color: #ff8a80; }
+.rec-btn:focus-visible { outline: 3px solid var(--gold-hi); outline-offset: 3px; }
 .app:not(.started) .panel, .app:not(.started) .shutter-row { display: none; }
 .shutter {
   width: 68px; height: 68px; border-radius: 50%; padding: 5px; cursor: pointer;
@@ -267,7 +285,8 @@ button { font: inherit; color: inherit; }
 }
 .sheet[hidden] { display: none; }
 .sheet-card { width: 100%; max-width: 440px; display: grid; gap: 16px; }
-.sheet-card img {
+.sheet-card video[hidden], .sheet-card img[hidden] { display: none; }
+.sheet-card img, .sheet-card video {
   width: 100%; max-height: 70dvh; object-fit: contain; border-radius: 12px; background: #0a2a22;
   outline: 3px solid var(--gold); outline-offset: 0;
   box-shadow: 0 0 0 9px rgba(227, 184, 92, 0.12), 0 24px 60px rgba(0, 0, 0, 0.7);

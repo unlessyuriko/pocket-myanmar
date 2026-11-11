@@ -120,6 +120,14 @@ function polygon(ctx, P, idx, scale = 1, center = null) {
   ctx.closePath();
 }
 
+// How long the "painting on" spread takes, and how far along a face is (0 to 1)
+export const REVEAL_MS = 750;
+export function revealProgress(P, opts) {
+  if (opts.now == null) return 1;
+  const born = Math.max((P.meta && P.meta.birth) || 0, opts.restart || 0);
+  return Math.min(1, Math.max(0, ((opts.now || 0) - born) / REVEAL_MS));
+}
+
 // ---------- head turn ----------
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const smoothstep = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -406,6 +414,19 @@ function drawFace(ctx, P, opts) {
   ctx.beginPath();
   faceOutline(ctx, P, 0.98);
   ctx.fill();
+
+  // "Painting on": the paste spreads out from the nose when a face appears or the shape changes
+  const rv = revealProgress(P, opts);
+  if (rv < 1) {
+    const e = 1 - Math.pow(1 - rv, 3);
+    const R = faceW * (0.1 + 0.9 * e);
+    const grd = ctx.createRadialGradient(noseMid.x, noseMid.y, R * 0.5, noseMid.x, noseMid.y, R);
+    grd.addColorStop(0, "rgba(0,0,0,1)");
+    grd.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.filter = "none";
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
 
   ctx.restore();
 }

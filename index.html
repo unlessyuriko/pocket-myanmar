@@ -29,6 +29,7 @@
     <section class="stage" id="stage">
       <video id="video" playsinline muted autoplay></video>
       <canvas id="view" role="img" aria-label="သနပ်ခါးလိမ်းထားသော သင့်မျက်နှာ"></canvas>
+      <canvas id="fx" aria-hidden="true"></canvas>
 
       <div class="intro" id="intro">
         <div class="intro-card">
@@ -48,6 +49,9 @@
 
       <div class="shutter-row">
         <button id="btnShutter" class="shutter" aria-label="ဓာတ်ပုံရိုက်မယ်" disabled><span></span></button>
+        <button id="btnRec" class="rec-btn" title="ဗီဒီယိုရိုက်မယ်" aria-label="ဗီဒီယိုရိုက်မယ် (၅ စက္ကန့်)" hidden>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3" y="6" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 10.5 21 7.5v9l-6-3Z" fill="currentColor"/></svg>
+        </button>
         <button id="btnFlip" class="flip-btn" title="ကင်မရာပြောင်းမယ်" aria-label="ကင်မရာပြောင်းမယ်" hidden>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 7h-3.5l-1.5-2h-6L7.5 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1ZM9 13a3 3 0 0 1 5.2-2M15 13a3 3 0 0 1-5.2 2M14.5 9.5v1.8h-1.8M9.5 16.5v-1.8h1.8"/></svg>
         </button>
@@ -78,6 +82,7 @@
   <div class="sheet" id="result" role="dialog" aria-modal="true" aria-label="ရိုက်ထားသောဓာတ်ပုံ" hidden>
     <div class="sheet-card">
       <img id="resultImg" alt="သင့်သနပ်ခါးဆယ်ဖီ" />
+      <video id="resultVideo" aria-label="သင့်သနပ်ခါးဗီဒီယို" playsinline muted loop controls hidden></video>
       <div class="sheet-actions">
         <button id="btnShare" class="btn primary">မျှဝေမယ်</button>
         <a id="btnSave" class="btn ghost" download="myanmar-vibe-thanakha.jpg">သိမ်းမယ်</a>

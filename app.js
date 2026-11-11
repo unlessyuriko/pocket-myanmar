@@ -1,5 +1,6 @@
 import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
-import { SHAPES, TONES, drawThanakha, drawShapeIcon } from "./thanakha.js";
+import { SHAPES, TONES, REVEAL_MS, drawThanakha, drawShapeIcon } from "./thanakha.js";
+import { createFx, readFace } from "./fx.js";
 import { createBlender } from "./blend.js";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
@@ -21,6 +22,8 @@ const lctx = layer.getContext("2d");
 const shade = document.createElement("canvas");
 const sctx = shade.getContext("2d");
 const stage = $("#stage");
+const fxCanvas = $("#fx");
+const fx = createFx(fxCanvas);
 const appEl = $(".app");
 
 const state = {
@@ -34,6 +37,8 @@ const state = {
   points: null,        // smoothed landmarks (pixels)
   facing: "user",      // "user" (front) | "environment" (back)
   mirror: true,        // front camera is shown mirrored
+  restart: 0,          // when the "painting on" last restarted (shape or colour change)
+  now: 0,              // time of the frame being drawn
 };
 
 let landmarker = null;
@@ -89,7 +94,7 @@ function buildShapePicker() {
       state.shape = s.id;
       selectRadio(wrap, b);
       b.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
-      redraw();
+      paintAgain();
     };
     wrap.append(b);
   }
@@ -111,7 +116,7 @@ function buildTones() {
       state.tone = t.id;
       selectRadio(wrap, b);
       buildShapePicker();
-      redraw();
+      paintAgain();
     };
     wrap.append(b);
   }
@@ -185,6 +190,8 @@ function toPixels(lms, w, h, mirror) {
 
 // Keep the list of tracked faces; state.points is the biggest one (used for the light reading)
 function setFaces(list) {
+  const now = performance.now();
+  for (const P of list) if (!P.meta) P.meta = { birth: now };
   list.sort((a, b) => faceWidth(b) - faceWidth(a));
   state.faces = list;
   state.points = list[0] || null;
@@ -201,7 +208,10 @@ function smoothFaces(nextList) {
       if (d < bestD) { bestD = d; best = i; }
     });
     if (best < 0 || bestD > faceWidth(next) * 0.8) return next;
-    return smooth(next, free.splice(best, 1)[0]);
+    const prev = free.splice(best, 1)[0];
+    const out = smooth(next, prev);
+    out.meta = prev.meta;
+    return out;
   });
 }
 
@@ -221,8 +231,8 @@ function smooth(next, prev) {
 // ---------- rendering ----------
 function sizeCanvases(w, h) {
   if (view.width !== w || view.height !== h) {
-    view.width = layer.width = w;
-    view.height = layer.height = h;
+    view.width = layer.width = fxCanvas.width = w;
+    view.height = layer.height = fxCanvas.height = h;
   }
 }
 
@@ -256,6 +266,7 @@ function measureFace(source, mirror) {
 
 function compose(source, mirror) {
   const W = view.width, H = view.height;
+  state.now = performance.now();
   if (blender) {
     drawThanakha(lctx, state.faces, state);
     measureFace(source, mirror);
@@ -298,6 +309,103 @@ function redraw() {
   if (state.mode === "photo" && state.photo) compose(state.photo, false);
 }
 
+// ---------- effects: painting-on, sparkles, reactions ----------
+// Thresholds for reading expressions from the face shape (ratios of face size)
+const REACT = { smileOn: 0.395, smileOff: 0.375, liftOn: 0.01, liftOff: 0.0, open: 0.07, shut: 0.14, eyeOpen: 0.2 };
+const GLINT_POINTS = [50, 280, 101, 330, 151, 9, 4, 205, 425, 117, 346, 234, 454, 10, 152, 195];
+
+function paintAgain() {
+  state.restart = performance.now();
+  animate();
+}
+
+function react(P, m, r, now) {
+  const cheeks = [50, 280];
+  // big smile: glints on both cheeks and a few petals
+  const smiling = m.smile
+    ? r.mouthW > REACT.smileOff && r.lift > REACT.liftOff
+    : r.mouthW > REACT.smileOn && r.lift > REACT.liftOn;
+  if (smiling && !m.smile && now > (m.coolSmile || 0)) {
+    for (const c of cheeks) fx.burst(P[c].x, P[c].y, r.faceW * 0.25, 8, r.faceW * 0.07);
+    fx.petals(P[10].x, P[10].y - r.faceH * 0.1, r.faceW * 0.7, 6, r.faceW * 0.09);
+    m.coolSmile = now + 2000;
+  }
+  m.smile = smiling;
+
+  // open mouth: petals rain down
+  if (r.open > REACT.open && now > (m.nextPetal || 0)) {
+    fx.petals(P[10].x, P[10].y - r.faceH * 0.25, r.faceW * 0.9, 1, r.faceW * 0.09);
+    m.nextPetal = now + 70;
+  }
+
+  // wink: a big glint pops at the closed eye
+  const a = r.eyeA < REACT.shut, b = r.eyeB < REACT.shut;
+  const winking = a !== b && (a ? r.eyeB : r.eyeA) > REACT.eyeOpen;
+  m.winkN = winking ? (m.winkN || 0) + 1 : 0;
+  if (m.winkN === 4 && now > (m.coolWink || 0)) {
+    const eye = a ? P[159] : P[386];
+    fx.burst(eye.x, eye.y, r.faceW * 0.3, 12, r.faceW * 0.07);
+    fx.star(eye.x, eye.y, r.faceW * 0.22, { max: 0.9 });
+    m.coolWink = now + 1500;
+  }
+}
+
+// One step of the effects. Returns true while the painting-on spread is still running.
+function stepEffects(now) {
+  let revealing = false;
+  for (const P of state.faces) {
+    const m = P.meta;
+    if (!m) continue;
+    const r = readFace(P);
+    const age = now - Math.max(m.birth, state.restart);
+    if (age < REVEAL_MS) {
+      revealing = true;
+      // glints appear on the spreading edge of the paste
+      const e = 1 - Math.pow(1 - age / REVEAL_MS, 3);
+      const R = r.faceW * (0.1 + 0.9 * e), nose = P[195];
+      for (let i = 0; i < 3; i++) {
+        const q = P[GLINT_POINTS[(Math.random() * GLINT_POINTS.length) | 0]];
+        const d = Math.hypot(q.x - nose.x, q.y - nose.y);
+        if (d < R && d > R * 0.55) fx.star(q.x, q.y, r.faceW * 0.05 * (0.6 + Math.random()), { max: 0.5 });
+      }
+    }
+    if (state.mode === "camera") react(P, m, r, now);
+  }
+  fx.update(now);
+  return revealing;
+}
+
+// Photo mode has no per-frame loop, so run one while something is animating
+let animating = false;
+function animate() {
+  if (animating) return;
+  animating = true;
+  const step = () => {
+    if (state.mode !== "photo") { animating = false; return; }
+    const now = performance.now();
+    const revealing = stepEffects(now);
+    if (state.photo) compose(state.photo, false);
+    if (revealing || fx.alive()) requestAnimationFrame(step);
+    else animating = false;
+  };
+  requestAnimationFrame(step);
+}
+
+// Flash and a burst of glints when the photo is taken
+function celebrate() {
+  fx.flash(0.5);
+  const faces = state.faces.length ? state.faces : [null];
+  for (const P of faces) {
+    if (P) {
+      const w = faceWidth(P), n = P[195];
+      fx.burst(n.x, n.y, w * 0.8, 22, w * 0.07);
+    } else {
+      fx.burst(fxCanvas.width / 2, fxCanvas.height / 2, fxCanvas.width * 0.3, 22, fxCanvas.width * 0.03);
+    }
+  }
+  if (state.mode === "photo") animate();
+}
+
 let missed = 0;
 function cameraLoop() {
   if (state.mode !== "camera") { loopRunning = false; return; }
@@ -316,6 +424,8 @@ function cameraLoop() {
     }
     compose(video, state.mirror);
   }
+  stepEffects(performance.now());
+  if (rec) recordFrame();
   requestAnimationFrame(cameraLoop);
 }
 
@@ -385,6 +495,7 @@ async function startCamera(facing = "user") {
   stage.classList.remove("photo");
   enterApp();
   updateFlipButton();
+  updateRecButton();
   if (!loopRunning) { loopRunning = true; requestAnimationFrame(cameraLoop); }
 }
 
@@ -401,6 +512,10 @@ async function updateFlipButton() {
     many = devices.filter((d) => d.kind === "videoinput").length > 1;
   } catch {}
   $("#btnFlip").hidden = !(many && state.mode === "camera");
+}
+
+function updateRecButton() {
+  $("#btnRec").hidden = !(recSupported && state.mode === "camera");
 }
 
 async function startPhoto(src) {
@@ -424,6 +539,7 @@ async function startPhoto(src) {
   setFaces([]);
   enterApp();
   $("#btnFlip").hidden = true;
+  updateRecButton();
   redraw();
 
   let lm;
@@ -433,6 +549,7 @@ async function startPhoto(src) {
   setFaces(found);
   if (!found.length) toast("ဒီဓာတ်ပုံထဲမှာ မျက်နှာ မတွေ့ပါ", 4000);
   redraw();
+  animate();
 }
 
 function enterApp() {
@@ -443,37 +560,48 @@ function enterApp() {
 }
 
 $("#btnCamera").onclick = () => startCamera("user");
-$("#btnFlip").onclick = () => startCamera(state.facing === "user" ? "environment" : "user");
+$("#btnFlip").onclick = () => !rec && startCamera(state.facing === "user" ? "environment" : "user");
 $("#filePhoto").onchange = (e) => {
   const f = e.target.files && e.target.files[0];
   if (f) startPhoto(URL.createObjectURL(f));
   e.target.value = "";
 };
 $("#btnSwitch").onclick = () => {
+  cancelRecording();
+  fx.clear();
   stopCamera();
   state.mode = null;
   appEl.classList.remove("started");
   $("#intro").hidden = false;
   $("#btnShutter").disabled = true;
   $("#btnFlip").hidden = true;
+  $("#btnRec").hidden = true;
   toast("");
   $("#btnCamera").focus();
 };
 
 // ---------- capture & share ----------
 let lastBlob = null;
+let lastType = "image/jpeg";
+let lastName = "myanmar-vibe-thanakha.jpg";
 let lastUrl = null;
 const resultEl = $("#result");
 let returnFocusTo = null;
 
-function openResult() {
+function openResult(kind = "image") {
   returnFocusTo = document.activeElement;
+  const isVideo = kind === "video";
+  $("#resultImg").hidden = isVideo;
+  const rv = $("#resultVideo");
+  rv.hidden = !isVideo;
+  if (isVideo) { rv.src = lastUrl; rv.play().catch(() => {}); } else { rv.pause(); rv.removeAttribute("src"); }
   appEl.inert = true;          // keep keyboard and screen-reader focus inside the popup
   resultEl.hidden = false;
   $("#btnShare").focus();
 }
 
 function closeResult() {
+  $("#resultVideo").pause();
   resultEl.hidden = true;
   appEl.inert = false;
   const back = returnFocusTo && document.contains(returnFocusTo) ? returnFocusTo : $("#btnShutter");
@@ -483,7 +611,7 @@ function closeResult() {
 resultEl.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { closeResult(); return; }
   if (e.key !== "Tab") return;
-  const items = [...resultEl.querySelectorAll("button, a.btn")];
+  const items = [...resultEl.querySelectorAll("button, a.btn")].filter((x) => !x.closest("[hidden]"));
   const first = items[0], last = items[items.length - 1];
   if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
   else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -491,6 +619,7 @@ resultEl.addEventListener("keydown", (e) => {
 resultEl.addEventListener("click", (e) => { if (e.target === resultEl) closeResult(); });
 
 $("#btnShutter").onclick = () => {
+  if (rec) return;
   const out = document.createElement("canvas");
   out.width = view.width;
   out.height = view.height;
@@ -513,20 +642,118 @@ $("#btnShutter").onclick = () => {
   o.textBaseline = "middle";
   o.fillText(text, pad + fs * 0.7, out.height - fs * 1.3 - pad);
 
+  // The saved picture is clean; the flash and glints play on screen for a moment first
+  celebrate();
+  $("#btnShutter").disabled = true;
   out.toBlob((blob) => {
-    lastBlob = blob;
-    if (lastUrl) URL.revokeObjectURL(lastUrl);
-    lastUrl = URL.createObjectURL(blob);
+    setResultFile(blob, "image/jpeg", "jpg");
     $("#resultImg").src = lastUrl;
-    $("#btnSave").href = lastUrl;
-    openResult();
+    setTimeout(() => { $("#btnShutter").disabled = false; openResult("image"); }, 450);
   }, "image/jpeg", 0.92);
 };
+
+function setResultFile(blob, type, ext) {
+  lastBlob = blob;
+  lastType = type;
+  lastName = "myanmar-vibe-thanakha." + ext;
+  if (lastUrl) URL.revokeObjectURL(lastUrl);
+  lastUrl = URL.createObjectURL(blob);
+  $("#btnSave").href = lastUrl;
+  $("#btnSave").download = lastName;
+}
+
+// ---------- 5-second video ----------
+const REC_MS = 5000;
+const recSupported = !!(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream);
+let rec = null;
+
+function pickMime() {
+  const types = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+  return types.find((t) => MediaRecorder.isTypeSupported(t)) || "";
+}
+
+function startRecording() {
+  const k = Math.min(1, 960 / Math.max(view.width, view.height));
+  const c = document.createElement("canvas");
+  c.width = Math.max(2, Math.round(view.width * k) & ~1);
+  c.height = Math.max(2, Math.round(view.height * k) & ~1);
+  const mime = pickMime();
+  let mr;
+  try {
+    mr = new MediaRecorder(c.captureStream(30), mime ? { mimeType: mime, videoBitsPerSecond: 3500000 } : {});
+  } catch {
+    toast("ဗီဒီယို မရိုက်နိုင်ပါ", 4000);
+    return;
+  }
+  // caption, drawn once and stamped on every frame
+  const wm = document.createElement("canvas");
+  const fs = Math.round(c.width * 0.032);
+  const text = "Myanmar Vibe · သနပ်ခါး";
+  const wg = wm.getContext("2d");
+  wg.font = `600 ${fs}px "Noto Sans Myanmar", "Myanmar Text", sans-serif`;
+  wm.width = Math.ceil(wg.measureText(text).width + fs * 1.4);
+  wm.height = Math.ceil(fs * 2.6);
+  wg.font = `600 ${fs}px "Noto Sans Myanmar", "Myanmar Text", sans-serif`;
+  wg.fillStyle = "rgba(6,32,26,0.6)";
+  wg.beginPath();
+  wg.roundRect ? wg.roundRect(0, 0, wm.width, wm.height, fs * 1.3) : wg.rect(0, 0, wm.width, wm.height);
+  wg.fill();
+  wg.fillStyle = "#e3b85c";
+  wg.textBaseline = "middle";
+  wg.fillText(text, fs * 0.7, wm.height / 2);
+
+  rec = { c, g: c.getContext("2d"), mr, wm, chunks: [], t0: performance.now(), mime: mr.mimeType || mime, cancelled: false };
+  const mine = rec;
+  mr.ondataavailable = (e) => { if (e.data && e.data.size) mine.chunks.push(e.data); };
+  mr.onstop = () => finishRecording(mine);
+  mr.start(250);
+  mine.timer = setTimeout(stopRecording, REC_MS);
+  $("#btnRec").classList.add("on");
+  $("#btnRec").setAttribute("aria-label", "ရပ်မယ်");
+  $("#btnShutter").disabled = true;
+  toast("ဗီဒီယို ရိုက်နေပါတယ်…");
+}
+
+function recordFrame() {
+  const { c, g, wm, t0 } = rec;
+  g.drawImage(view, 0, 0, c.width, c.height);
+  g.drawImage(fxCanvas, 0, 0, c.width, c.height);
+  g.drawImage(wm, wm.height * 0.25, c.height - wm.height * 1.25);
+  $("#btnRec").style.setProperty("--p", Math.min(1, (performance.now() - t0) / REC_MS).toFixed(3));
+}
+
+function stopRecording() {
+  if (!rec) return;
+  clearTimeout(rec.timer);
+  if (rec.mr.state !== "inactive") rec.mr.stop();
+}
+
+function cancelRecording() {
+  if (!rec) return;
+  rec.cancelled = true;
+  stopRecording();
+}
+
+function finishRecording(r) {
+  if (rec === r) rec = null;
+  const btn = $("#btnRec");
+  btn.classList.remove("on");
+  btn.style.removeProperty("--p");
+  btn.setAttribute("aria-label", "ဗီဒီယိုရိုက်မယ် (၅ စက္ကန့်)");
+  $("#btnShutter").disabled = state.mode === null;
+  toast("");
+  if (r.cancelled || !r.chunks.length) return;
+  const type = (r.mime || "video/webm").split(";")[0];
+  setResultFile(new Blob(r.chunks, { type }), type, type.includes("mp4") ? "mp4" : "webm");
+  openResult("video");
+}
+
+$("#btnRec").onclick = () => (rec ? stopRecording() : startRecording());
 
 $("#btnBack").onclick = closeResult;
 $("#btnShare").onclick = async () => {
   if (!lastBlob) return;
-  const file = new File([lastBlob], "myanmar-vibe-thanakha.jpg", { type: "image/jpeg" });
+  const file = new File([lastBlob], lastName, { type: lastType });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file], title: "Myanmar Vibe", text: "သနပ်ခါး လိမ်းထားတယ် 🌼" }); } catch {}
   } else {
@@ -549,4 +776,4 @@ if (!(navigator.connection && navigator.connection.saveData)) {
 
 // Testing helper: ?img=<url> opens a photo straight away
 const testImg = new URLSearchParams(location.search).get("img");
-if (testImg) { window.__thanakha = { state, layer }; startPhoto(testImg); }
+if (testImg) { window.__thanakha = { state, layer, readFace, fx }; startPhoto(testImg); }
