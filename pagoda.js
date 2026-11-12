@@ -359,7 +359,7 @@ const Sound = (() => {
         tg.gain.setValueAtTime(0.3 * k, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
         th.connect(tg).connect(out); th.start(t); th.stop(t + 0.09);
       };
-      [1, 0.95, 0.9].forEach((k, i) => strike(t0 + i * 1.0, k));    // "tong.... tong.... tong" one second apart
+      [1, 0.95, 0.9].forEach((k, i) => strike(t0 + i * 1.5, k));    // "tong.... tong.... tong" one and a half seconds apart
     },
     pour() {
       const c = get(); if (!c) return; const t = c.currentTime, len = 2.4;
@@ -818,10 +818,10 @@ function frame(now, xrFrame) {
   // bell swing
   if (swing) {
     swing.t += dt;
-    let rz = 0;                                                  // a fresh knock at each of the three strikes, one second apart
-    for (let k = 0; k < 3; k++) { const u = swing.t - k; if (u > 0) rz += Math.sin(u * 9) * 0.35 * Math.exp(-u * 1.3); }
+    let rz = 0;                                                  // a fresh knock at each of the three strikes, 1.5 s apart
+    for (let k = 0; k < 3; k++) { const u = swing.t - k * 1.5; if (u > 0) rz += Math.sin(u * 9) * 0.35 * Math.exp(-u * 1.3); }
     swing.ud.bell.rotation.z = rz;
-    if (swing.t > 6) { swing.ud.bell.rotation.z = 0; swing = null; }
+    if (swing.t > 7.5) { swing.ud.bell.rotation.z = 0; swing = null; }
   }
   // flowers pop in
   popping = popping.filter((o) => {
