@@ -76,7 +76,14 @@
 .tools .pill:disabled { opacity: 0.45; cursor: default; }
 .tools .strength { flex: 1 1 120px; }
 
-.pagoda:not(.started) .shutter-row { display: none; }
+.pagoda:not(.started) .shutter-row, .pagoda:not(.started) .sound-btn { display: none; }
+/* background sound on / off */
+.sound-btn {
+  position: absolute; top: 12px; right: 12px; z-index: 4; width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center; font-size: 20px; line-height: 1; color: var(--gold-hi);
+  background: rgba(6, 30, 24, 0.78); backdrop-filter: blur(6px); border: 1px solid var(--ring);
+}
+.sound-btn:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
 /* phone AR draws the camera itself, so the page must be see-through (and the photo button is off: use the phone's screenshot) */
 html:has(.pagoda.xr), body:has(.pagoda.xr), .pagoda.xr, .pagoda.xr .stage { background: transparent !important; }
 .pagoda.xr #video, .pagoda.xr #gl, .pagoda.xr .shutter-row { display: none; }

@@ -25,6 +25,7 @@ Open `pagoda.html` (linked from the start screen). Only your own birth-day corne
   - On iPhone Safari there is no surface detection. It uses the motion sensors and assumes the table is 0.45 m below the phone, so it holds its direction but not its position if you walk.
   - Pinch or use the slider to change its size; drag to turn it.
 - **Worship:** pour water over your animal, light the lamps, offer flowers and ring the bell. Doing all four gives "သာဓု သာဓု သာဓု". A small merit count and day streak are kept on the phone only.
+- **Background sound:** a breeze, birds (fewer at night), the small bells hanging from the pagoda tinkling in the wind, and now and then a far-off temple bell. It is made in code and starts when you tap Start; a speaker button at the top right of the picture turns it off and on (remembered on the phone).
 - **Lighting** follows the time in Yangon (morning, day, evening, night).
 - **Photo:** a share card with the scene, your weekday animal and merit count.
 - The Shwedagon behind the corner is at real size (1 unit is about 1 m: 99 m to the dome, 112 m with the hti): the plinth, terraces, bell and spire are built in code, and 64 shrine-stupas around the base repeat one generated model (`models/shrine.glb`). The Buddha, silver table, bell and holder, tiger and guinea pig are also compressed generated models in `models/`; the other animals and small offerings are built in code. Sounds use the Web Audio API.

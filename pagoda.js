@@ -214,15 +214,94 @@ const Sound = (() => {
     if (ctx.state === "suspended") ctx.resume();
     return ctx;
   };
-  const partial = (c, t, f, a, len, type = "sine") => {
+  const partial = (c, t, f, a, len, type = "sine", dest = c.destination) => {
     const o = c.createOscillator(), g = c.createGain();
     o.type = type; o.frequency.value = f;
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0006, t + len);
-    o.connect(g).connect(c.destination); o.start(t); o.stop(t + len + 0.05);
+    o.connect(g).connect(dest); o.start(t); o.stop(t + len + 0.05);
   };
+
+  // The pagoda's own background: a breeze, birds, the little bells hanging from the hti and the eaves tinkling in the wind,
+  // and now and then a far-off temple bell. All made in code, and kept quiet under the offering sounds.
+  let amb = null, muted = false;
+  try { muted = localStorage.getItem("mv.mute") === "1"; } catch { /* ignore */ }
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const later = (fn, lo, hi) => {
+    const tick = () => { if (!amb) return; if (!document.hidden) fn(); amb.timers.push(setTimeout(tick, rnd(lo, hi) * 1000)); };
+    amb.timers.push(setTimeout(tick, rnd(lo, hi) * 1000));
+  };
+  const pan = (c, dest, p) => { if (!c.createStereoPanner) return dest; const s = c.createStereoPanner(); s.pan.value = p; s.connect(dest); return s; };
+  const tweet = (c, dest, t, f0, f1, len, a) => {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + len);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a, t + len * 0.25); g.gain.exponentialRampToValueAtTime(0.0005, t + len);
+    o.connect(g).connect(dest); o.start(t); o.stop(t + len + 0.05);
+  };
+  const birdCall = (c, master) => {
+    const dest = pan(c, master, rnd(-0.8, 0.8)), t = c.currentTime + 0.05;
+    const base = rnd(2300, 4300), a = rnd(0.012, 0.03);
+    if (Math.random() < 0.25) {                                   // a slow two-note call, "koo-eel"
+      tweet(c, dest, t, base * 0.35, base * 0.5, 0.38, a * 1.6);
+      tweet(c, dest, t + 0.5, base * 0.4, base * 0.62, 0.55, a * 1.6);
+      return;
+    }
+    const n = 2 + ((Math.random() * 5) | 0), gap = rnd(0.09, 0.16);   // a quick run of tweets
+    for (let i = 0; i < n; i++) {
+      const up = Math.random() < 0.5, f = base * rnd(0.9, 1.15);
+      tweet(c, dest, t + i * gap, up ? f * 0.8 : f * 1.15, up ? f * 1.2 : f * 0.85, rnd(0.05, 0.09), a);
+    }
+  };
+  const SCALE = [1568, 1760, 2093, 2349, 2637, 3136, 3520];
+  const windBells = (c, master) => {                              // a few small bells knocking together in a gust
+    const n = 2 + ((Math.random() * 4) | 0), dest = pan(c, master, rnd(-0.7, 0.7));
+    let t = c.currentTime + 0.05;
+    for (let i = 0; i < n; i++) {
+      const f = SCALE[(Math.random() * SCALE.length) | 0], a = rnd(0.012, 0.03);
+      [[1, 1, 2.2], [2.76, 0.4, 1.2], [5.4, 0.18, 0.6]].forEach(([m, k, l]) => partial(c, t, f * m, a * k, l, "sine", dest));
+      t += rnd(0.07, 0.38);
+    }
+  };
+  const farBell = (c, master) => {                                // a temple bell somewhere across the platform
+    const dest = pan(c, master, rnd(-0.6, 0.6)), t = c.currentTime + 0.05, lp = c.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 1100; lp.connect(dest);
+    [[1, 0.07, 6], [2, 0.04, 4.5], [2.54, 0.025, 3.2], [3.1, 0.015, 2.4]].forEach(([m, a, l]) => partial(c, t, 196 * m, a, l, "sine", lp));
+  };
+  const startAmbient = () => {
+    const c = get(); if (!c || amb) return;
+    const master = c.createGain(); master.gain.value = muted ? 0 : 1; master.connect(c.destination);
+    amb = { master, timers: [] };
+    // wind: looped noise through a low band that swells and fades slowly, plus a thin high breeze
+    const len = c.sampleRate * 4, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) { last = last * 0.97 + (Math.random() * 2 - 1) * 0.03; d[i] = last * 6; }
+    const wind = c.createBufferSource(); wind.buffer = buf; wind.loop = true;
+    const low = c.createBiquadFilter(); low.type = "lowpass"; low.frequency.value = 520;
+    const lg = c.createGain(); lg.gain.value = 0.07;
+    const hi = c.createBiquadFilter(); hi.type = "bandpass"; hi.frequency.value = 1700; hi.Q.value = 0.5;
+    const hg = c.createGain(); hg.gain.value = 0.014;
+    wind.connect(low).connect(lg).connect(master); wind.connect(hi).connect(hg).connect(master);
+    for (const [g, rate, depth] of [[lg, 0.09, 0.045], [hg, 0.13, 0.012]]) {
+      const lfo = c.createOscillator(), amt = c.createGain();
+      lfo.frequency.value = rate; amt.gain.value = depth; lfo.connect(amt).connect(g.gain); lfo.start();
+    }
+    wind.start();
+    const day = () => 1 - 0.85 * (S.night || 0);                   // fewer birds at night
+    later(() => { if (Math.random() < day()) birdCall(c, master); }, 1.8, 6);
+    later(() => windBells(c, master), 2.5, 8);
+    later(() => farBell(c, master), 24, 45);
+    setTimeout(() => { if (amb && !document.hidden) windBells(c, master); }, 900);
+  };
+  document.addEventListener("visibilitychange", () => { if (ctx && amb) { if (document.hidden) ctx.suspend(); else if (!muted) ctx.resume(); } });
   return {
     unlock: get,
+    ambient: startAmbient,
+    get muted() { return muted; },
+    setMuted(v) {
+      muted = v;
+      try { localStorage.setItem("mv.mute", v ? "1" : "0"); } catch { /* ignore */ }
+      if (amb && ctx) amb.master.gain.setTargetAtTime(v ? 0 : 1, ctx.currentTime, 0.15);
+    },
     // a big bronze temple bell: a hard strike, inharmonic partials in slightly detuned pairs (the slow "wah-wah" beating of
     // a real bell), a deep hum, and a soft echo so it rings on
     bell(strength = 1) {
@@ -364,7 +443,16 @@ async function startXR() {
     return true;
   } catch { return false; }
 }
-for (const sel of ["#panel", "#intro", ".topbar", ".shutter-row", "#toast"]) {
+// background sound on / off
+const soundBtn = $("#btnSound");
+const showSound = () => {
+  soundBtn.textContent = Sound.muted ? "🔇" : "🔊";
+  soundBtn.setAttribute("aria-pressed", String(!Sound.muted));
+  soundBtn.setAttribute("aria-label", Sound.muted ? "နောက်ခံအသံ ဖွင့်မယ်" : "နောက်ခံအသံ ပိတ်မယ်");
+};
+soundBtn.onclick = () => { Sound.unlock(); Sound.setMuted(!Sound.muted); showSound(); };
+showSound();
+for (const sel of ["#panel", "#intro", ".topbar", ".shutter-row", "#toast", "#btnSound"]) {
   const el = document.querySelector(sel);
   if (el) el.addEventListener("beforexrselect", (e) => e.preventDefault());
 }
@@ -516,6 +604,7 @@ $("#size").oninput = (e) => setScale(+e.target.value);
 $("#btnStart").onclick = async () => {
   if (pickedDay == null) return;
   Sound.unlock();
+  Sound.ambient();
   selectDay(pickedDay, true);
   $("#intro").hidden = true;
   if (changingDay) {                                  // just switching to another day's shrine
