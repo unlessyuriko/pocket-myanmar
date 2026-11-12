@@ -562,31 +562,73 @@ export function setCornerDay(corner, day, m, font = corner.userData.font) {
   ud.plate.material.needsUpdate = true;
 }
 
-// ---------- the view behind: an arcade wall and Shwedagon ----------
+// ---------- the view behind: the Shwedagon at real size ----------
+// 1 unit is about 1 m (the weekday Buddha is ~1.5 m). The real stupa is 99 m to the dome and 112 m with the hti, on
+// a square plinth ~6 m high that is ~430 m round, ringed by 64 small shrine-stupas. The terraces, bell and spire are
+// smooth shapes built in code (so they stay crisp at any size); the shrines are a detailed generated model, repeated.
+const goldLeaf = (rx, ry) => {
+  const t = canvasTex(256, 256, (x, w, h) => {
+    x.fillStyle = "#e6b645"; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {          // hammered gold-leaf plates
+      const v = 205 + ((i * 7 + j * 13) % 5) * 9;
+      x.fillStyle = `rgb(${v + 25},${v - 20},${v - 150})`; x.fillRect(i * 64 + 1, j * 64 + 1, 62, 62);
+    }
+    x.strokeStyle = "rgba(110,70,10,0.55)"; x.lineWidth = 2;
+    for (let i = 0; i <= 4; i++) { x.beginPath(); x.moveTo(i * 64, 0); x.lineTo(i * 64, h); x.stroke(); x.beginPath(); x.moveTo(0, i * 64); x.lineTo(w, i * 64); x.stroke(); }
+    x.fillStyle = "rgba(120,75,10,0.6)";
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) for (const [dx, dy] of [[8, 8], [56, 8], [8, 56], [56, 56]]) { x.beginPath(); x.arc(i * 64 + dx, j * 64 + dy, 2.2, 0, 7); x.fill(); }
+  }, [rx, ry]);
+  return new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: 1.2, color: 0xffe7a8, metalness: 0.85, roughness: 0.34 });
+};
+
+export function buildShwedagon(m) {
+  const g = new THREE.Group();
+  const S = 31;                                   // the code-built stupa is ~3.4 tall, so this makes it ~105 m
+  // three square plinth terraces
+  const HS = [70, 66, 62], TH = 2.2;
+  HS.forEach((h, i) => {
+    const t = new THREE.Mesh(new THREE.BoxGeometry(h * 2, TH, h * 2), goldLeaf(h / 2, 1));
+    t.position.y = TH / 2 + i * TH; g.add(t);
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(h * 2 + 0.8, 0.35, h * 2 + 0.8), m.goldDeep);
+    lip.position.y = TH * (i + 1) - 0.15; g.add(lip);
+  });
+  const topY = TH * HS.length;
+  const stupa = buildStupa(m, { plinth: false });
+  const leaf = goldLeaf(10, 5);
+  stupa.traverse((o) => { if (o.isMesh && o.material === m.gold) o.material = leaf; });
+  stupa.scale.setScalar(S); stupa.position.y = topY;
+  g.add(stupa);
+  g.userData.stupa = stupa;
+  // the ring of 64 shrine-stupas along the top terrace: a large one in the middle of each side, a medium one at each corner
+  const slots = [];
+  const edge = 58, n = 16, step = (edge * 2) / n;
+  for (let side = 0; side < 4; side++) for (let k = 0; k < n; k++) {
+    const t = -edge + k * step, a = side * Math.PI / 2;
+    const lx = t, lz = edge;                       // point on the front side, then rotated for each side
+    const px = lx * Math.cos(a) + lz * Math.sin(a), pz = -lx * Math.sin(a) + lz * Math.cos(a);
+    const big = k === n / 2, corner = k === 0;
+    slots.push({ x: px, z: pz, rot: a, h: big ? 20 : corner ? 15 : 11 });
+  }
+  const spare = buildStupa(m, { plinth: false });
+  for (const s of slots) {
+    const slot = new THREE.Group();
+    slot.position.set(s.x, topY, s.z); slot.rotation.y = s.rot;
+    const fb = spare.clone(true); fb.scale.setScalar(s.h / 3.4); slot.add(fb);
+    g.add(slot);
+    loadModel("shrine", s.h).then((o) => { slot.remove(fb); slot.add(o); }).catch(() => {});
+  }
+  return g;
+}
+
 export function buildBackdrop(m) {
   const g = new THREE.Group();
-  // (the arcade wall, its pillars and the step were removed: the pagoda stands alone behind the corner)
-  const stupa = buildStupa(m, { plinth: false });
-  stupa.scale.setScalar(1.5);
-  stupa.position.set(0, 0, -6.2);
-  g.add(stupa);
-  // smaller stupas on either side, as on the Shwedagon platform
-  for (const sx of []) for (const [x, z, s] of [[4.2, -5.0, 0.5], [6.4, -6.6, 0.4]]) {   // side stupas dropped: the real model has its own ring of shrines
-    const small = buildStupa(m, { plinth: false });
-    small.scale.setScalar(s); small.position.set(sx * x, 0, z);
-    g.add(small);
-  }
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(260, 140), new THREE.MeshStandardMaterial({ color: 0xcfc6b2, roughness: 0.7 }));
-  ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.13, -62);   // the platform runs back under the pagoda
+  const pagoda = buildShwedagon(m);
+  pagoda.position.set(0, -0.1, -78);              // the front edge of the plinth is ~8 m behind the corner
+  g.add(pagoda);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(420, 240), new THREE.MeshStandardMaterial({ color: 0xcfc6b2, roughness: 0.7 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.13, -100);   // the platform runs back under the pagoda
   g.add(ground);
-  g.userData.stupa = stupa;
-  // the real Shwedagon (generated model with its ring of shrines) replaces the code-built stupa
-  // real-world scale: the corner's Buddha is ~1.5 units (about a metre) and the Shwedagon is huge, so the corner sits in
-  // front of its foundation: only the lowest terraces and the ring of shrines fill the view behind it
-  loadModel("shwedagon", 38).then((o) => {
-    o.position.set(0, -0.1, -24);
-    g.add(o); stupa.visible = false;
-  }).catch(() => {});
+  g.userData.stupa = pagoda.userData.stupa;
   return g;
 }
 

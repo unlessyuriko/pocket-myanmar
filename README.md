@@ -18,7 +18,7 @@ Face tracking uses Google MediaPipe Face Landmarker and runs entirely on the dev
 
 ## Feature 2: Pagoda at Home (ဘုရားဖူး)
 
-Open `pagoda.html` (linked from the start screen). Only your own birth-day corner appears over the rear camera, like the weekday corners at the Shwedagon: a seated Buddha on a gold drum, your animal in a tiled basin in front, a bell frame beside it, and the golden Shwedagon with a long arcade wall as the backdrop. The eight animals (tiger, lion, two elephants, rat, guinea pig, naga, garuda) are modelled in code.
+Open `pagoda.html` (linked from the start screen). Only your own birth-day corner appears over the rear camera, like the weekday corners at the Shwedagon: a seated Buddha on a gold drum, your animal in a tiled basin in front, a bell frame beside it, and the foundation of the golden Shwedagon rising behind it. The eight animals are tiger, lion, two elephants, rat, guinea pig, naga and garuda.
 
 - **Place it:** pick your birth day (Wednesday morning and Rahu are separate), point at a table or shelf and tap.
   - On phones with WebXR AR (Android Chrome), the app finds the real flat surface: a ring shows where it will land, and the corner stays stuck to that surface as you walk around. The camera is shown by the phone, so the photo button is off there; use the phone's screenshot.
@@ -27,7 +27,7 @@ Open `pagoda.html` (linked from the start screen). Only your own birth-day corne
 - **Worship:** pour water over your animal, light the lamps, offer flowers and ring the bell. Doing all four gives "သာဓု သာဓု သာဓု". A small merit count and day streak are kept on the phone only.
 - **Lighting** follows the time in Yangon (morning, day, evening, night).
 - **Photo:** a share card with the scene, your weekday animal and merit count.
-- Everything is drawn in code (no model files) with three.js, and the sounds are made with the Web Audio API.
+- The Shwedagon behind the corner is at real size (1 unit is about 1 m: 99 m to the dome, 112 m with the hti): the plinth, terraces, bell and spire are built in code, and 64 shrine-stupas around the base repeat one generated model (`models/shrine.glb`). The Buddha, silver table, bell and holder, tiger and guinea pig are also compressed generated models in `models/`; the other animals and small offerings are built in code. Sounds use the Web Audio API.
 - Respect: the page asks people to place it on a table or shelf, never on the ground.
 
 ## Run locally
