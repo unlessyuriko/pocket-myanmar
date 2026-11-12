@@ -223,10 +223,32 @@ const Sound = (() => {
   };
   return {
     unlock: get,
-    bell() {
+    // a big bronze temple bell: a hard strike, inharmonic partials in slightly detuned pairs (the slow "wah-wah" beating of
+    // a real bell), a deep hum, and a soft echo so it rings on
+    bell(strength = 1) {
       const c = get(); if (!c) return; const t = c.currentTime;
-      [[1, 0.3, 3.6], [2.01, 0.17, 2.6], [2.76, 0.12, 2.0], [4.07, 0.07, 1.4], [5.43, 0.045, 1.0]].forEach(([m, a, l]) => partial(c, t, 392 * m, a, l));
-      partial(c, t, 96, 0.22, 2.2);
+      const out = c.createGain(); out.gain.value = 0.9 * strength;
+      const echo = c.createDelay(); echo.delayTime.value = 0.23;
+      const fb = c.createGain(); fb.gain.value = 0.32;
+      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 5200;
+      out.connect(lp); lp.connect(c.destination);
+      lp.connect(echo); echo.connect(fb); fb.connect(echo); echo.connect(c.destination);
+      const ring = (f, a, len, detune = 0) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = "sine"; o.frequency.value = f; o.detune.value = detune;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a, t + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0005, t + len);
+        o.connect(g).connect(out); o.start(t); o.stop(t + len + 0.1);
+      };
+      const hum = 146;                                   // the bell's deep note
+      [[0.5, 0.34, 7.5], [1, 0.5, 6.5], [1.19, 0.2, 5.0], [1.5, 0.22, 4.5], [2, 0.3, 4.0], [2.54, 0.16, 3.0], [3.1, 0.1, 2.4], [4.2, 0.07, 1.6], [5.6, 0.04, 1.0]]
+        .forEach(([m, a, l]) => { ring(hum * m, a, l, -3); ring(hum * m, a * 0.8, l * 0.92, 3.5); });
+      const len = 0.09, buf = c.createBuffer(1, Math.ceil(c.sampleRate * len), c.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (d.length * 0.18));
+      const src = c.createBufferSource(); src.buffer = buf;
+      const hp = c.createBiquadFilter(); hp.type = "bandpass"; hp.frequency.value = 2600; hp.Q.value = 0.8;
+      const sg = c.createGain(); sg.gain.value = 0.55;
+      src.connect(hp).connect(sg).connect(out); src.start(t);   // the clang of the strike
     },
     pour() {
       const c = get(); if (!c) return; const t = c.currentTime, len = 2.4;
@@ -427,6 +449,7 @@ $("#offBell").onclick = () => {
   if (!S.corner) return;
   swing = { t: 0, ud: S.corner.userData };
   Sound.bell();
+  setTimeout(() => Sound.bell(0.35), 950);     // the bell swings back and touches the striker again, softer
   offered("bell");
 };
 
