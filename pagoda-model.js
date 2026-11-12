@@ -496,6 +496,23 @@ export function buildCorner(m, day, font) {
     day, plate, buddha, flames, light, cup, bell: pivot, flowers: [], animal: null,
     bowlPos: flowerBowl.position.clone().add(new THREE.Vector3(0, 0, -0.45)), font,
   };
+  // the silver bell and its holder: two real models, so the bell can swing on its chain from the hook
+  const FRAME_H = 2.2, BELL_H = FRAME_H * 0.6, HOOK = 0.786;
+  Promise.all([loadModel("bellframe", FRAME_H), loadModel("bell", BELL_H)]).then(([fr, bell]) => {
+    const holder = new THREE.Group();
+    holder.position.set(-2.1, 0, -0.1);
+    holder.rotation.y = 0.35;
+    holder.add(fr);
+    const pivot = new THREE.Group();            // swings from the hook
+    pivot.position.set(0, FRAME_H * HOOK, 0);
+    bell.position.y = -BELL_H;
+    pivot.add(bell);
+    holder.add(pivot);
+    core.add(holder);
+    core.remove(frame);
+    g.userData.bell = pivot;
+  }).catch(() => {});
+
   setCornerDay(g, day, m, font);
   return g;
 }
