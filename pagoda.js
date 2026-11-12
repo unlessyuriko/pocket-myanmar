@@ -272,20 +272,21 @@ const Sound = (() => {
       tweet(c, dest, t + i * gap, up ? f * 0.8 : f * 1.15, up ? f * 1.2 : f * 0.85, rnd(0.05, 0.09), a);
     }
   };
-  const SCALE = [1568, 1760, 2093, 2349, 2637, 3136, 3520];
-  const windBells = (c, master) => {                              // a few small bells knocking together in a gust
-    const n = 2 + ((Math.random() * 4) | 0), dest = pan(c, master, rnd(-0.7, 0.7));
+  const SCALE = [784, 880, 1047, 1175, 1319, 1568];              // a gentle pentatonic, lower than before so it stays mellow
+  const windBells = (c, master) => {                              // a couple of small bells, softly, in a light breeze
+    const n = 2 + ((Math.random() * 3) | 0), dest = pan(c, master, rnd(-0.7, 0.7)), soft = c.createBiquadFilter();
+    soft.type = "lowpass"; soft.frequency.value = 2400; soft.connect(dest);
     let t = c.currentTime + 0.05;
     for (let i = 0; i < n; i++) {
-      const f = SCALE[(Math.random() * SCALE.length) | 0], a = rnd(0.012, 0.03);
-      [[1, 1, 2.2], [2.76, 0.4, 1.2], [5.4, 0.18, 0.6]].forEach(([m, k, l]) => partial(c, t, f * m, a * k, l, "sine", dest));
-      t += rnd(0.07, 0.38);
+      const f = SCALE[(Math.random() * SCALE.length) | 0], a = rnd(0.004, 0.009);
+      [[1, 1, 3.4], [2.76, 0.22, 1.8]].forEach(([m, k, l]) => partial(c, t, f * m, a * k, l, "sine", soft));
+      t += rnd(0.3, 0.75);
     }
   };
   const farBell = (c, master) => {                                // a temple bell somewhere across the platform
     const dest = pan(c, master, rnd(-0.6, 0.6)), t = c.currentTime + 0.05, lp = c.createBiquadFilter();
     lp.type = "lowpass"; lp.frequency.value = 1100; lp.connect(dest);
-    [[1, 0.07, 6], [2, 0.04, 4.5], [2.54, 0.025, 3.2], [3.1, 0.015, 2.4]].forEach(([m, a, l]) => partial(c, t, 196 * m, a, l, "sine", lp));
+    [[1, 0.035, 7], [2, 0.018, 5], [2.54, 0.01, 3.5]].forEach(([m, a, l]) => partial(c, t, 196 * m, a, l, "sine", lp));
   };
   const startAmbient = () => {
     const c = get(); if (!c || amb) return;
@@ -308,8 +309,8 @@ const Sound = (() => {
     wind.start();
     const day = () => 1 - 0.85 * (S.night || 0);                   // fewer birds at night
     later(() => { if (Math.random() < day()) birdCall(c, master); }, 1.8, 6);
-    later(() => windBells(c, master), 2.5, 8);
-    later(() => farBell(c, master), 24, 45);
+    later(() => windBells(c, master), 6, 15);
+    later(() => farBell(c, master), 35, 60);
     setTimeout(() => { if (amb && !document.hidden) windBells(c, master); }, 900);
   };
   document.addEventListener("visibilitychange", () => { if (ctx && amb) { if (document.hidden) ctx.suspend(); else if (!muted) ctx.resume(); } });
@@ -323,32 +324,40 @@ const Sound = (() => {
       try { localStorage.setItem("mv.mute", v ? "1" : "0"); } catch { /* ignore */ }
       if (amb && ctx) amb.master.gain.setTargetAtTime(v ? 0 : 1, ctx.currentTime, 0.15);
     },
-    // a big bronze temple bell: a hard strike, inharmonic partials in slightly detuned pairs (the slow "wah-wah" beating of
-    // a real bell), a deep hum, and a soft echo so it rings on
-    bell(strength = 1) {
-      const c = get(); if (!c) return; const t = c.currentTime;
-      const out = c.createGain(); out.gain.value = 0.9 * strength;
-      const echo = c.createDelay(); echo.delayTime.value = 0.23;
-      const fb = c.createGain(); fb.gain.value = 0.32;
-      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 5200;
-      out.connect(lp); lp.connect(c.destination);
-      lp.connect(echo); echo.connect(fb); fb.connect(echo); echo.connect(c.destination);
-      const ring = (f, a, len, detune = 0) => {
-        const o = c.createOscillator(), g = c.createGain();
-        o.type = "sine"; o.frequency.value = f; o.detune.value = detune;
-        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a, t + 0.006);
-        g.gain.exponentialRampToValueAtTime(0.0005, t + len);
-        o.connect(g).connect(out); o.start(t); o.stop(t + len + 0.1);
+    // the bell button: a brass bell struck three times with a wooden stick, half a second apart, each ringing into an echo.
+    // Each strike is a short dull wooden "tok" and brass partials (slightly detuned pairs, so it shimmers) that die away.
+    bell() {
+      const c = get(); if (!c) return; const t0 = c.currentTime + 0.03;
+      const out = c.createGain(); out.gain.value = 0.9;
+      const echo = c.createDelay(); echo.delayTime.value = 0.28;
+      const fb = c.createGain(); fb.gain.value = 0.4;
+      const damp = c.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 3200;   // each echo is a little duller
+      out.connect(c.destination);
+      out.connect(echo); echo.connect(damp); damp.connect(fb); fb.connect(echo); damp.connect(c.destination);
+      const strike = (t, k) => {
+        const ring = (f, a, len, detune) => {
+          const o = c.createOscillator(), g = c.createGain();
+          o.type = "sine"; o.frequency.value = f; o.detune.value = detune;
+          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * k, t + 0.003);
+          g.gain.exponentialRampToValueAtTime(0.0005, t + len);
+          o.connect(g).connect(out); o.start(t); o.stop(t + len + 0.1);
+        };
+        const f0 = 392;                                    // brass bell, about G4
+        [[0.5, 0.12, 1.6], [1, 0.5, 2.8], [2.32, 0.26, 1.9], [3.86, 0.15, 1.3], [5.7, 0.08, 0.8], [7.9, 0.04, 0.5]]
+          .forEach(([m, a, l]) => { ring(f0 * m, a, l, -4); ring(f0 * m, a * 0.7, l * 0.9, 5); });
+        // the stick: a short band of noise for the knock and a low, quickly fading thump of wood
+        const len = 0.05, buf = c.createBuffer(1, Math.ceil(c.sampleRate * len), c.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (d.length * 0.2));
+        const src = c.createBufferSource(); src.buffer = buf;
+        const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1500; bp.Q.value = 1.1;
+        const sg = c.createGain(); sg.gain.value = 0.5 * k;
+        src.connect(bp).connect(sg).connect(out); src.start(t);
+        const th = c.createOscillator(), tg = c.createGain();
+        th.type = "sine"; th.frequency.setValueAtTime(230, t); th.frequency.exponentialRampToValueAtTime(110, t + 0.05);
+        tg.gain.setValueAtTime(0.35 * k, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+        th.connect(tg).connect(out); th.start(t); th.stop(t + 0.08);
       };
-      const hum = 146;                                   // the bell's deep note
-      [[0.5, 0.34, 7.5], [1, 0.5, 6.5], [1.19, 0.2, 5.0], [1.5, 0.22, 4.5], [2, 0.3, 4.0], [2.54, 0.16, 3.0], [3.1, 0.1, 2.4], [4.2, 0.07, 1.6], [5.6, 0.04, 1.0]]
-        .forEach(([m, a, l]) => { ring(hum * m, a, l, -3); ring(hum * m, a * 0.8, l * 0.92, 3.5); });
-      const len = 0.09, buf = c.createBuffer(1, Math.ceil(c.sampleRate * len), c.sampleRate), d = buf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (d.length * 0.18));
-      const src = c.createBufferSource(); src.buffer = buf;
-      const hp = c.createBiquadFilter(); hp.type = "bandpass"; hp.frequency.value = 2600; hp.Q.value = 0.8;
-      const sg = c.createGain(); sg.gain.value = 0.55;
-      src.connect(hp).connect(sg).connect(out); src.start(t);   // the clang of the strike
+      [1, 0.92, 0.85].forEach((k, i) => strike(t0 + i * 0.5, k));
     },
     pour() {
       const c = get(); if (!c) return; const t = c.currentTime, len = 2.4;
@@ -557,8 +566,7 @@ $("#offFlower").onclick = () => {
 $("#offBell").onclick = () => {
   if (!S.corner) return;
   swing = { t: 0, ud: S.corner.userData };
-  Sound.bell();
-  setTimeout(() => Sound.bell(0.35), 950);     // the bell swings back and touches the striker again, softer
+  Sound.bell();                                // three strikes, half a second apart
   offered("bell");
 };
 
