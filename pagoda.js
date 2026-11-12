@@ -208,12 +208,32 @@ async function startCamera() {
 
 // ---------- sound (made in code, so there is nothing to download) ----------
 const Sound = (() => {
-  let ctx = null;
+  let ctx = null, silent = null;
+  // Phones are picky: iPhone treats Web Audio as "ringer" sound, so the silent switch mutes it, and both iPhone and Android
+  // keep the audio engine paused until a tap resumes it. So: ask for "playback" audio, loop a silent <audio> (which makes
+  // iOS play through the speaker even in silent mode), and resume on every tap until it is really running.
+  const wake = () => {
+    try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch { /* ignore */ }
+    try {
+      if (!silent) {
+        const n = 8000, v = new DataView(new ArrayBuffer(44 + n * 2));
+        const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+        w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+        v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 16000, true); v.setUint16(32, 2, true);
+        v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+        silent = new Audio(URL.createObjectURL(new Blob([v], { type: "audio/wav" })));
+        silent.loop = true; silent.setAttribute("playsinline", ""); silent.volume = 0.01;
+      }
+      silent.play().catch(() => {});
+    } catch { /* ignore */ }
+  };
   const get = () => {
     if (!ctx) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; ctx = new A(); }
-    if (ctx.state === "suspended") ctx.resume();
+    wake();
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
     return ctx;
   };
+  for (const ev of ["pointerdown", "touchend", "click"]) document.addEventListener(ev, () => { if (!ctx || ctx.state !== "running") get(); }, { passive: true });
   const partial = (c, t, f, a, len, type = "sine", dest = c.destination) => {
     const o = c.createOscillator(), g = c.createGain();
     o.type = type; o.frequency.value = f;
@@ -295,6 +315,7 @@ const Sound = (() => {
   document.addEventListener("visibilitychange", () => { if (ctx && amb) { if (document.hidden) ctx.suspend(); else if (!muted) ctx.resume(); } });
   return {
     unlock: get,
+    get state() { return ctx ? ctx.state : "none"; },
     ambient: startAmbient,
     get muted() { return muted; },
     setMuted(v) {
@@ -605,6 +626,7 @@ $("#btnStart").onclick = async () => {
   if (pickedDay == null) return;
   Sound.unlock();
   Sound.ambient();
+  setTimeout(() => { if (Sound.state !== "running" && !Sound.muted) flash("အသံမကြားရရင် ဖုန်းကို silent မဟုတ်အောင်ပြင်ပြီး 🔊 ကို နှိပ်ပါ", 5000); }, 1200);
   selectDay(pickedDay, true);
   $("#intro").hidden = true;
   if (changingDay) {                                  // just switching to another day's shrine
