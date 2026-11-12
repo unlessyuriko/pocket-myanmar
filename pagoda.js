@@ -329,8 +329,8 @@ const Sound = (() => {
     bell() {
       const c = get(); if (!c) return; const t0 = c.currentTime + 0.03;
       const out = c.createGain(); out.gain.value = 0.9;
-      const echo = c.createDelay(); echo.delayTime.value = 0.28;
-      const fb = c.createGain(); fb.gain.value = 0.4;
+      const echo = c.createDelay(); echo.delayTime.value = 0.38;
+      const fb = c.createGain(); fb.gain.value = 0.36;
       const damp = c.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 3200;   // each echo is a little duller
       out.connect(c.destination);
       out.connect(echo); echo.connect(damp); damp.connect(fb); fb.connect(echo); damp.connect(c.destination);
@@ -338,26 +338,28 @@ const Sound = (() => {
         const ring = (f, a, len, detune) => {
           const o = c.createOscillator(), g = c.createGain();
           o.type = "sine"; o.frequency.value = f; o.detune.value = detune;
-          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * k, t + 0.003);
+          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a * k, t + 0.008);
           g.gain.exponentialRampToValueAtTime(0.0005, t + len);
           o.connect(g).connect(out); o.start(t); o.stop(t + len + 0.1);
         };
-        const f0 = 392;                                    // brass bell, about G4
-        [[0.5, 0.12, 1.6], [1, 0.5, 2.8], [2.32, 0.26, 1.9], [3.86, 0.15, 1.3], [5.7, 0.08, 0.8], [7.9, 0.04, 0.5]]
-          .forEach(([m, a, l]) => { ring(f0 * m, a, l, -4); ring(f0 * m, a * 0.7, l * 0.9, 5); });
+        // a deep, round "tong": a low brass note that hangs and sings on (a few seconds), so each strike is still ringing
+        // when the next one lands, with the slow shimmer of two slightly different pitches beating against each other
+        const f0 = 247;                                    // about B3
+        [[0.5, 0.16, 5.5], [1, 0.52, 6.5], [2.02, 0.28, 4.8], [2.98, 0.14, 3.4], [4.1, 0.07, 2.3], [5.4, 0.035, 1.5]]
+          .forEach(([m, a, l]) => { ring(f0 * m, a, l, -3.5); ring(f0 * m, a * 0.8, l * 0.95, 4); });
         // the stick: a short band of noise for the knock and a low, quickly fading thump of wood
         const len = 0.05, buf = c.createBuffer(1, Math.ceil(c.sampleRate * len), c.sampleRate), d = buf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (d.length * 0.2));
         const src = c.createBufferSource(); src.buffer = buf;
         const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1500; bp.Q.value = 1.1;
-        const sg = c.createGain(); sg.gain.value = 0.5 * k;
+        const sg = c.createGain(); sg.gain.value = 0.28 * k;
         src.connect(bp).connect(sg).connect(out); src.start(t);
         const th = c.createOscillator(), tg = c.createGain();
-        th.type = "sine"; th.frequency.setValueAtTime(230, t); th.frequency.exponentialRampToValueAtTime(110, t + 0.05);
-        tg.gain.setValueAtTime(0.35 * k, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-        th.connect(tg).connect(out); th.start(t); th.stop(t + 0.08);
+        th.type = "sine"; th.frequency.setValueAtTime(170, t); th.frequency.exponentialRampToValueAtTime(90, t + 0.06);
+        tg.gain.setValueAtTime(0.3 * k, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+        th.connect(tg).connect(out); th.start(t); th.stop(t + 0.09);
       };
-      [1, 0.92, 0.85].forEach((k, i) => strike(t0 + i * 0.5, k));
+      [1, 0.95, 0.9].forEach((k, i) => strike(t0 + i * 1.0, k));    // "tong.... tong.... tong" one second apart
     },
     pour() {
       const c = get(); if (!c) return; const t = c.currentTime, len = 2.4;
@@ -816,8 +818,10 @@ function frame(now, xrFrame) {
   // bell swing
   if (swing) {
     swing.t += dt;
-    swing.ud.bell.rotation.z = Math.sin(swing.t * 9) * 0.5 * Math.exp(-swing.t * 1.3);
-    if (swing.t > 3.5) { swing.ud.bell.rotation.z = 0; swing = null; }
+    let rz = 0;                                                  // a fresh knock at each of the three strikes, one second apart
+    for (let k = 0; k < 3; k++) { const u = swing.t - k; if (u > 0) rz += Math.sin(u * 9) * 0.35 * Math.exp(-u * 1.3); }
+    swing.ud.bell.rotation.z = rz;
+    if (swing.t > 6) { swing.ud.bell.rotation.z = 0; swing = null; }
   }
   // flowers pop in
   popping = popping.filter((o) => {
