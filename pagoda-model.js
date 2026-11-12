@@ -354,7 +354,7 @@ function plaqueTexture(day, font, bare = false) {
     x.strokeStyle = "#5c6368"; x.lineWidth = 6; x.stroke();
   }
   x.fillStyle = bare ? "#3a2606" : "#1c2226"; x.textAlign = "center"; x.textBaseline = "middle";
-  x.font = `700 70px ${font}`; x.fillText(day.day, 256, 66, 470);
+  x.font = `700 70px ${font}`; x.fillText(day.day + "နံ", 256, 66, 470);
   x.font = `600 52px ${font}`; x.fillText(day.animal, 256, 140, 470);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
@@ -501,7 +501,8 @@ export function buildCorner(m, day, font) {
     core.add(top);
     const ud = g.userData;
     ud.bare = true;                                // the model already has a gold plate: only draw the text on it
-    plate.position.set(0, 1.245, 1.32);
+    plate.position.set(0, 1.26, 1.204);            // the model's gold plate face is flat at z≈1.198
+    plate.material.polygonOffset = true; plate.material.polygonOffsetFactor = -2; plate.material.polygonOffsetUnits = -2;
     plate.scale.set(1.45, 1.0, 1);
     plate.material.map.dispose();
     plate.material.map = plaqueTexture(ud.day, font, true);
