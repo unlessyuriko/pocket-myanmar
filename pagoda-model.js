@@ -565,31 +565,28 @@ export function setCornerDay(corner, day, m, font = corner.userData.font) {
 // ---------- the view behind: an arcade wall and Shwedagon ----------
 export function buildBackdrop(m) {
   const g = new THREE.Group();
-  const wall = new THREE.Mesh(new THREE.PlaneGeometry(11, 2.0), m.arcade);
-  wall.position.set(0, 1.0, -2.8);
-  g.add(wall);
-  for (const sx of [-1, 1]) {
-    g.add(cyl(0.16, 0.2, 2.3, sx * 5.5, 1.15, -2.75, m.gold));
-    g.add(cyl(0.26, 0.18, 0.18, sx * 5.5, 2.38, -2.75, m.gold));
-  }
-  // a platform step in front of the wall
-  const step = new THREE.Mesh(new THREE.BoxGeometry(11.2, 0.12, 0.7), m.marble);
-  step.position.set(0, 0.06, -2.65);
-  g.add(step);
+  // (the arcade wall, its pillars and the step were removed: the pagoda stands alone behind the corner)
   const stupa = buildStupa(m, { plinth: false });
   stupa.scale.setScalar(1.5);
   stupa.position.set(0, 0, -6.2);
   g.add(stupa);
   // smaller stupas on either side, as on the Shwedagon platform
-  for (const sx of [-1, 1]) for (const [x, z, s] of [[4.2, -5.0, 0.5], [6.4, -6.6, 0.4]]) {
+  for (const sx of []) for (const [x, z, s] of [[4.2, -5.0, 0.5], [6.4, -6.6, 0.4]]) {   // side stupas dropped: the real model has its own ring of shrines
     const small = buildStupa(m, { plinth: false });
     small.scale.setScalar(s); small.position.set(sx * x, 0, z);
     g.add(small);
   }
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(22, 9), new THREE.MeshStandardMaterial({ color: 0xcfc6b2, roughness: 0.7 }));
-  ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.13, -5.5);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(260, 140), new THREE.MeshStandardMaterial({ color: 0xcfc6b2, roughness: 0.7 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.13, -62);   // the platform runs back under the pagoda
   g.add(ground);
   g.userData.stupa = stupa;
+  // the real Shwedagon (generated model with its ring of shrines) replaces the code-built stupa
+  // real-world scale: the corner's Buddha is ~1.5 units (about a metre) and the Shwedagon is huge, so the corner sits in
+  // front of its foundation: only the lowest terraces and the ring of shrines fill the view behind it
+  loadModel("shwedagon", 38).then((o) => {
+    o.position.set(0, -0.1, -24);
+    g.add(o); stupa.visible = false;
+  }).catch(() => {});
   return g;
 }
 

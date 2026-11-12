@@ -72,7 +72,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 const scene = new THREE.Scene();
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
-const camera = new THREE.PerspectiveCamera(62, 1, 0.03, 40);
+const camera = new THREE.PerspectiveCamera(62, 1, 0.03, 600);
 camera.rotation.order = "YXZ";
 
 const hemi = new THREE.HemisphereLight(0xcfe4ff, 0x503820, 0.9);
