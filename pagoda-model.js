@@ -22,7 +22,7 @@ export function loadModel(name, height) {
       box.setFromObject(o);
       const c = box.getCenter(new THREE.Vector3());
       o.position.set(-c.x, -box.min.y, -c.z);
-      o.traverse((n) => { if (n.isMesh && n.material) { n.material.envMapIntensity = 1.2; if (n.material.metalness != null) n.material.metalness = Math.max(n.material.metalness, 0.7); } });
+      o.traverse((n) => { if (n.isMesh && n.material) { n.material.side = THREE.DoubleSide; n.material.envMapIntensity = 1.2; if (n.material.metalness != null) n.material.metalness = Math.max(n.material.metalness, 0.7); } });
       const wrap = new THREE.Group();
       wrap.add(o);
       return wrap;
@@ -343,15 +343,17 @@ export function buildAnimal(id, m) {
 }
 
 // ---------- small textures ----------
-function plaqueTexture(day, font) {
+function plaqueTexture(day, font, bare = false) {
   const c = document.createElement("canvas");
   c.width = 512; c.height = 200;
   const x = c.getContext("2d");
-  const g = x.createLinearGradient(0, 0, 0, 200);
-  g.addColorStop(0, "#d9dde0"); g.addColorStop(1, "#9aa1a6");
-  x.fillStyle = g; x.beginPath(); x.roundRect(4, 4, 504, 192, 16); x.fill();
-  x.strokeStyle = "#5c6368"; x.lineWidth = 6; x.stroke();
-  x.fillStyle = "#1c2226"; x.textAlign = "center"; x.textBaseline = "middle";
+  if (!bare) {                                    // a plain plate drawn in code
+    const g = x.createLinearGradient(0, 0, 0, 200);
+    g.addColorStop(0, "#d9dde0"); g.addColorStop(1, "#9aa1a6");
+    x.fillStyle = g; x.beginPath(); x.roundRect(4, 4, 504, 192, 16); x.fill();
+    x.strokeStyle = "#5c6368"; x.lineWidth = 6; x.stroke();
+  }
+  x.fillStyle = bare ? "#3a2606" : "#1c2226"; x.textAlign = "center"; x.textBaseline = "middle";
   x.font = `700 70px ${font}`; x.fillText(day.day, 256, 66, 470);
   x.font = `600 52px ${font}`; x.fillText(day.animal, 256, 140, 470);
   const t = new THREE.CanvasTexture(c);
@@ -414,17 +416,18 @@ export function buildCorner(m, day, font) {
   g.add(inner);
 
   // four gold pillars and the drum on top (the animal stands between them)
+  const oldTable = new THREE.Group();             // simple shapes, used until the real table model loads
   for (const a of [-135, -60, 60, 135]) {
     const r = 0.88, ang = (a * Math.PI) / 180;
-    g.add(cyl(0.1, 0.12, 1.5, Math.sin(ang) * r, 0.75, Math.cos(ang) * r, m.goldDeep));
+    oldTable.add(cyl(0.1, 0.12, 1.5, Math.sin(ang) * r, 0.75, Math.cos(ang) * r, m.goldDeep));
   }
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.36, 32, 1), m.drum);
   drum.position.y = TABLE_Y - 0.18;
-  g.add(drum);
+  oldTable.add(drum);
   for (const [r, y, h] of [[1.12, TABLE_Y - 0.36, 0.06], [1.12, TABLE_Y, 0.06], [0.98, TABLE_Y + 0.04, 0.04]]) {
-    const ring = cyl(r, r, h, 0, y, 0, m.gold);
-    g.add(ring);
+    oldTable.add(cyl(r, r, h, 0, y, 0, m.gold));
   }
+  g.add(oldTable);
 
   // name plate on the front of the drum, like the silver ones at the pagoda
   const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.2), new THREE.MeshBasicMaterial({ map: plaqueTexture(day, font), transparent: true }));
@@ -486,6 +489,24 @@ export function buildCorner(m, day, font) {
   core.position.z = -0.45;
   for (const o of [...g.children]) if (o !== slab && o !== basin && o !== inner) core.add(o);
   g.add(core);
+  // the silver table with its gold name plate replaces the drum and pillars
+  loadModel("table", 2.07).then((t) => {
+    core.add(t);
+    core.remove(oldTable);
+    // the generated table has no tabletop surface, so lay a silver one inside the raised rim
+    const tb = new THREE.Box3().setFromObject(t), ts = tb.getSize(new THREE.Vector3());
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(ts.x * 0.44, ts.x * 0.44, 0.04, 48),
+      new THREE.MeshStandardMaterial({ color: 0xdfe3e6, metalness: 0.85, roughness: 0.28 }));
+    top.position.set((tb.min.x + tb.max.x) / 2, TABLE_Y - 0.03, (tb.min.z + tb.max.z) / 2);
+    core.add(top);
+    const ud = g.userData;
+    ud.bare = true;                                // the model already has a gold plate: only draw the text on it
+    plate.position.set(0, 1.245, 1.32);
+    plate.scale.set(1.45, 1.0, 1);
+    plate.material.map.dispose();
+    plate.material.map = plaqueTexture(ud.day, font, true);
+    plate.material.needsUpdate = true;
+  }).catch(() => {});
   loadModel("buddha", 1.5).then((o) => {            // the real Buddha on its lotus base replaces the simple one
     o.position.set(0, TABLE_Y + 0.04, 0);
     core.add(o);
@@ -536,7 +557,7 @@ export function setCornerDay(corner, day, m, font = corner.userData.font) {
     }).catch(() => {});
   }
   ud.plate.material.map.dispose();
-  ud.plate.material.map = plaqueTexture(day, font);
+  ud.plate.material.map = plaqueTexture(day, font, !!ud.bare);
   ud.plate.material.needsUpdate = true;
 }
 
