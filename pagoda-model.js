@@ -11,7 +11,7 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 const gltf = new GLTFLoader();
 gltf.setMeshoptDecoder(MeshoptDecoder);
 const modelCache = new Map();
-const MODELS = new Map([["mon", 1.45], ["tue", 1.45], ["wed", 1.6], ["rahu", 1.6], ["thu", 1.4], ["fri", 1.5], ["sat", 1.6]]);       // birth-day id -> height in corner units
+const MODELS = new Map([["mon", 1.45], ["tue", 1.45], ["wed", 1.6], ["rahu", 1.6], ["thu", 1.4], ["fri", 1.5], ["sat", 1.6], ["sun", 1.7]]);       // birth-day id -> height in corner units
 export function loadModel(name, height) {
   if (!modelCache.has(name)) {
     modelCache.set(name, gltf.loadAsync(`models/${name}.glb`).then((g) => {
@@ -22,7 +22,8 @@ export function loadModel(name, height) {
       box.setFromObject(o);
       const c = box.getCenter(new THREE.Vector3());
       o.position.set(-c.x, -box.min.y, -c.z);
-      o.traverse((n) => { if (n.isMesh && n.material) { n.material.side = THREE.DoubleSide; n.material.envMapIntensity = 1.2; if (n.material.metalness != null) n.material.metalness = Math.max(n.material.metalness, 0.7); } });
+      o.traverse((n) => { if (n.isMesh && n.material) { n.material.side = THREE.DoubleSide; n.material.envMapIntensity = 1.2; if (n.material.metalness != null) n.material.metalness = Math.max(n.material.metalness, 0.7);
+        if (name === "buddha") { const mt = n.material; mt.roughnessMap = null; mt.metalnessMap = null; mt.metalness = 0.8; mt.roughness = 0.22; mt.envMapIntensity = 2.4; mt.emissive = new THREE.Color(0x6b4a10); mt.emissiveIntensity = 0.5; mt.needsUpdate = true; } } });   // polished gold, as shiny as the animals
       const wrap = new THREE.Group();
       wrap.add(o);
       return wrap;
@@ -584,35 +585,44 @@ const goldLeaf = (rx, ry) => {
 export function buildShwedagon(m) {
   const g = new THREE.Group();
   const S = 31;                                   // the code-built stupa is ~3.4 tall, so this makes it ~105 m
-  // three square plinth terraces
-  const HS = [70, 66, 62], TH = 2.2;
-  HS.forEach((h, i) => {
-    const t = new THREE.Mesh(new THREE.BoxGeometry(h * 2, TH, h * 2), goldLeaf(h / 2, 1));
-    t.position.y = TH / 2 + i * TH; g.add(t);
-    const lip = new THREE.Mesh(new THREE.BoxGeometry(h * 2 + 0.8, 0.35, h * 2 + 0.8), m.goldDeep);
-    lip.position.y = TH * (i + 1) - 0.15; g.add(lip);
-  });
-  const topY = TH * HS.length;
+  // seen from above the Shwedagon is not square: a grey octagonal platform, then gold terraces that step in with
+  // notched (star-like) edges, then the round bell. Each terrace is two octagons turned by 22.5 degrees.
+  const PR = 66, PH = 2.0;                        // platform circumradius and height
+  const plat = new THREE.Mesh(new THREE.CylinderGeometry(PR, PR, PH, 8), new THREE.MeshStandardMaterial({ color: 0xc9c7ba, roughness: 0.75 }));
+  plat.position.y = PH / 2; plat.rotation.y = Math.PI / 8; g.add(plat);
+  const STEPS = 9, SH = 0.8;
+  for (let i = 0; i < STEPS; i++) {
+    const R = 59 - i * 1.3, y = PH + i * SH + SH / 2;
+    const a = new THREE.Mesh(new THREE.CylinderGeometry(R, R, SH, 8), goldLeaf(14, 1));
+    a.position.y = y; a.rotation.y = Math.PI / 8; g.add(a);
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.965, R * 0.965, SH, 8), goldLeaf(14, 1));
+    b.position.y = y; g.add(b);
+  }
+  const topY = PH + STEPS * SH;
   const stupa = buildStupa(m, { plinth: false });
   const leaf = goldLeaf(10, 5);
   stupa.traverse((o) => { if (o.isMesh && o.material === m.gold) o.material = leaf; });
   stupa.scale.setScalar(S); stupa.position.y = topY;
   g.add(stupa);
   g.userData.stupa = stupa;
-  // the ring of 64 shrine-stupas along the top terrace: a large one in the middle of each side, a medium one at each corner
+  // the ring of 64 shrine-stupas along the edge of the octagonal platform: a large one in the middle of each of the
+  // four main sides, smaller ones in a row on every side
   const slots = [];
-  const edge = 58, n = 16, step = (edge * 2) / n;
-  for (let side = 0; side < 4; side++) for (let k = 0; k < n; k++) {
-    const t = -edge + k * step, a = side * Math.PI / 2;
-    const lx = t, lz = edge;                       // point on the front side, then rotated for each side
-    const px = lx * Math.cos(a) + lz * Math.sin(a), pz = -lx * Math.sin(a) + lz * Math.cos(a);
-    const big = k === n / 2, corner = k === 0;
-    slots.push({ x: px, z: pz, rot: a, h: big ? 20 : corner ? 15 : 11 });
+  const ap = PR * Math.cos(Math.PI / 8), L = 2 * PR * Math.sin(Math.PI / 8), off = ap - 4;
+  for (let side = 0; side < 8; side++) {
+    const th = side * Math.PI / 4, nx = Math.sin(th), nz = Math.cos(th), tx = Math.cos(th), tz = -Math.sin(th);
+    const main = side % 2 === 0, cnt = main ? 8 : 9;
+    for (let k = 0; k < cnt; k++) {
+      const t = ((k + 0.5) / cnt - 0.5) * (L - 6);
+      if (main && (k === 3 || k === 4)) continue;  // room for the big one
+      slots.push({ x: nx * off + tx * t, z: nz * off + tz * t, rot: th, h: 11 });
+    }
+    if (main) slots.push({ x: nx * (off - 3), z: nz * (off - 3), rot: th, h: 20 });
   }
   const spare = buildStupa(m, { plinth: false });
   for (const s of slots) {
     const slot = new THREE.Group();
-    slot.position.set(s.x, topY, s.z); slot.rotation.y = s.rot;
+    slot.position.set(s.x, PH, s.z); slot.rotation.y = s.rot;
     const fb = spare.clone(true); fb.scale.setScalar(s.h / 3.4); slot.add(fb);
     g.add(slot);
     loadModel("shrine", s.h).then((o) => { slot.remove(fb); slot.add(o); }).catch(() => {});
@@ -623,7 +633,7 @@ export function buildShwedagon(m) {
 export function buildBackdrop(m) {
   const g = new THREE.Group();
   const pagoda = buildShwedagon(m);
-  pagoda.position.set(0, -0.1, -78);              // the front edge of the plinth is ~8 m behind the corner
+  pagoda.position.set(0, -0.1, -70);              // the front edge of the platform is ~9 m behind the corner
   g.add(pagoda);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(420, 240), new THREE.MeshStandardMaterial({ color: 0xcfc6b2, roughness: 0.7 }));
   ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.13, -100);   // the platform runs back under the pagoda
