@@ -11,7 +11,7 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 const gltf = new GLTFLoader();
 gltf.setMeshoptDecoder(MeshoptDecoder);
 const modelCache = new Map();
-const MODELS = new Map([["mon", 1.45], ["fri", 1.5]]);       // birth-day id -> height in corner units
+const MODELS = new Map([["mon", 1.45], ["tue", 1.45], ["wed", 1.6], ["rahu", 1.6], ["thu", 1.4], ["fri", 1.5], ["sat", 1.6]]);       // birth-day id -> height in corner units
 export function loadModel(name, height) {
   if (!modelCache.has(name)) {
     modelCache.set(name, gltf.loadAsync(`models/${name}.glb`).then((g) => {

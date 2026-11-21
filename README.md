@@ -28,7 +28,7 @@ Open `pagoda.html` (linked from the start screen). Only your own birth-day corne
 - **Background sound:** a breeze, birds (fewer at night), the small bells hanging from the pagoda tinkling in the wind, and now and then a far-off temple bell. It is made in code and starts when you tap Start; a speaker button at the top right of the picture turns it off and on (remembered on the phone).
 - **Lighting** follows the time in Yangon (morning, day, evening, night).
 - **Photo:** a share card with the scene, your weekday animal and merit count.
-- The Shwedagon behind the corner is at real size (1 unit is about 1 m: 99 m to the dome, 112 m with the hti): the plinth, terraces, bell and spire are built in code, and 64 shrine-stupas around the base repeat one generated model (`models/shrine.glb`). The Buddha, silver table, bell and holder, tiger and guinea pig are also compressed generated models in `models/`; the other animals and small offerings are built in code. Sounds use the Web Audio API.
+- The Shwedagon behind the corner is at real size (1 unit is about 1 m: 99 m to the dome, 112 m with the hti): the plinth, terraces, bell and spire are built in code, and 64 shrine-stupas around the base repeat one generated model (`models/shrine.glb`). The Buddha, silver table, bell and holder, and the animals for Monday to Saturday (tiger, lion, both elephants, rat, guinea pig, naga) are also compressed generated models in `models/`; the garuda (Sunday) and the small offerings are built in code. Sounds use the Web Audio API.
 - Respect: the page asks people to place it on a table or shelf, never on the ground.
 
 ## Run locally
