@@ -3,9 +3,11 @@
 // turn the 3D camera as you turn the phone, so the pagoda stays where you put it.
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { DAYS, makeMaterials, buildCorner, setCornerDay, buildBackdrop, TABLE_Y, addFlowers, glowTexture } from "./pagoda-model.js";
+import { DAYS, makeMaterials, buildCorner, setCornerDay, buildBackdrop, TABLE_Y, addFlowers, glowTexture, preloadModel, SHARED_MODELS } from "./pagoda-model.js";
+import { showGuards } from "./guard.js";
 
 const $ = (s) => document.querySelector(s);
+if (showGuards({ needsWebGL: true }).blocked) throw new Error("WebGL is not available");     // the message is already on screen; Start stays off
 const app = $("#app"), stage = $("#stage"), video = $("#video"), glCanvas = $("#gl");
 const FONT = '"Noto Sans Myanmar","Myanmar Text","Padauk",sans-serif';
 const MM = "၀၁၂၃၄၅၆၇၈၉";
@@ -393,8 +395,21 @@ DAYS.forEach((d, i) => {
   daysEl.append(b);
 });
 let pickedDay = null;
+// Download the shared pieces while the person is still choosing, and the chosen animal as soon as it is chosen,
+// so the corner is ready by the time they tap Start. A thin bar under the button shows how far it has got.
+const loadBar = $("#loadbar");
+const wanted = new Set(), done = new Set();
+function want(name) {
+  if (wanted.has(name)) return;
+  wanted.add(name);
+  const fin = () => { done.add(name); loadBar.style.setProperty("--p", done.size / wanted.size); loadBar.hidden = done.size >= wanted.size; };
+  loadBar.hidden = false; loadBar.style.setProperty("--p", done.size / wanted.size);
+  preloadModel(name).then(fin, fin);                 // a failed file keeps the simple shape drawn in code
+}
+(window.requestIdleCallback || ((f) => setTimeout(f, 300)))(() => SHARED_MODELS.forEach(want));
 function pickDay(i) {
   pickedDay = i;
+  want(DAYS[i].id);
   daysEl.querySelectorAll(".day").forEach((b) => b.setAttribute("aria-checked", String(+b.dataset.i === i)));
   $("#btnStart").disabled = false;
 }

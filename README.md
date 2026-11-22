@@ -28,7 +28,7 @@ Open `pagoda.html` (linked from the start screen). Only your own birth-day corne
 - **Background sound:** a breeze, birds (fewer at night), the small bells hanging from the pagoda tinkling in the wind, and now and then a far-off temple bell. It is made in code and starts when you tap Start; a speaker button at the top right of the picture turns it off and on (remembered on the phone).
 - **Lighting** follows the time in Yangon (morning, day, evening, night).
 - **Photo:** a share card with the scene, your weekday animal and merit count.
-- The Shwedagon behind the corner is at real size (1 unit is about 1 m: 99 m to the dome, 112 m with the hti): the plinth, terraces, bell and spire are built in code, and 64 shrine-stupas around the base repeat one generated model (`models/shrine.glb`). The Buddha, silver table, bell and holder, and the animals for Monday to Saturday (tiger, lion, both elephants, rat, guinea pig, naga) are also compressed generated models in `models/`; the garuda (Sunday) and the small offerings are built in code. Sounds use the Web Audio API.
+- The Shwedagon behind the corner is at real size (1 unit is about 1 m: 99 m to the dome, 112 m with the hti): the eight-sided platform, stepped terraces, bell and spire are built in code. Around the platform sit 60 shrine-stupas (one repeated generated model, `models/shrine.glb`) and four gilded prayer halls with a large seated Buddha, one in the middle of each main side (`models/hall.glb`). The Buddha, silver table, bell and holder, and the animals for Monday to Saturday (tiger, lion, both elephants, rat, guinea pig, naga) are also compressed generated models in `models/`; the garuda (Sunday) and the small offerings are built in code. Sounds use the Web Audio API.
 - Respect: the page asks people to place it on a table or shelf, never on the ground.
 
 ## Run locally
@@ -56,6 +56,10 @@ Phones only allow camera access on **https** links. Host the folder on any stati
 - `occlude.js`: finds what sits in front of the face so the paste stays under it. Hair comes from MediaPipe's small hair model (under 1 MB): a fringe or loose strands over the forehead and temples. Only the area above the eye line is used, because the model mistakes shadowed jaw and ear skin for hair. Hands come from MediaPipe's hand landmarks (about 8 MB), drawn as a palm-and-fingers shape. Both load in the background after the face tracker, and the hand model is skipped on data-saver and slow connections.
 - `blend.js`: WebGL shader that blends the paste into the skin using its light and shadow
 - `pagoda.html`, `pagoda.css`, `pagoda.js`, `pagoda-model.js`: the pagoda feature (page, scene and interaction, and the 3D shapes). Add `?debug` to the address to expose `window.__pagoda` for testing.
+- `guard.js`: warns when the page is opened inside Facebook / Messenger / Instagram / TikTok's own browser (camera often blocked) with a copy-link button, and when WebGL is missing
+- `privacy.html`: privacy note (Burmese and English)
+- `og-image.png`, `og-pagoda.png`: share-preview pictures (1200×630) for the Open Graph tags. The tags use `https://pocket-myanmar.vercel.app`; change it in `index.html` and `pagoda.html` when there is a custom domain.
+- `vercel.json`: security headers and cache rules (models cached a week, scripts revalidated)
 - `logo.svg`: logo, also used as the browser tab icon
 
 To add a new shape, add an entry to `SHAPES` and a `case` in `cheekShape()` in `thanakha.js`. Shapes are drawn in face-local units, where `u` points outward from the nose and `v` points down.

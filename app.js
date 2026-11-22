@@ -5,6 +5,8 @@ import { TEX_SIZE } from "./facemap.js";
 import { createFx, readFace } from "./fx.js";
 import { createBlender } from "./blend.js";
 import { createOccluder } from "./occlude.js";
+import { showGuards } from "./guard.js";
+showGuards();                                  // warns when opened inside Facebook / Messenger's own browser
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";

@@ -10,26 +10,30 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 // Any that fail to load keep the simple shape built in code.
 const gltf = new GLTFLoader();
 gltf.setMeshoptDecoder(MeshoptDecoder);
-const modelCache = new Map();
+const rawCache = new Map();
 const MODELS = new Map([["mon", 1.45], ["tue", 1.45], ["wed", 1.6], ["rahu", 1.6], ["thu", 1.4], ["fri", 1.5], ["sat", 1.6], ["sun", 1.7]]);       // birth-day id -> height in corner units
+export const DAY_MODEL_HEIGHT = (id) => MODELS.get(id);
+export const SHARED_MODELS = ["buddha", "table", "bellframe", "bell", "shrine", "hall"];     // every birth day uses these
+// Starts downloading a file (once) and returns the loaded glTF; loadModel then only has to scale a copy.
+export function preloadModel(name) {
+  if (!rawCache.has(name)) rawCache.set(name, gltf.loadAsync(`models/${name}.glb`));
+  return rawCache.get(name);
+}
 export function loadModel(name, height) {
-  if (!modelCache.has(name)) {
-    modelCache.set(name, gltf.loadAsync(`models/${name}.glb`).then((g) => {
-      const o = g.scene;
-      const box = new THREE.Box3().setFromObject(o);
-      const size = box.getSize(new THREE.Vector3());
-      o.scale.setScalar(height / size.y);
-      box.setFromObject(o);
-      const c = box.getCenter(new THREE.Vector3());
-      o.position.set(-c.x, -box.min.y, -c.z);
-      o.traverse((n) => { if (n.isMesh && n.material) { n.material.side = THREE.DoubleSide; n.material.envMapIntensity = 1.2; if (n.material.metalness != null) n.material.metalness = Math.max(n.material.metalness, 0.7);
-        if (name === "buddha") { const mt = n.material; mt.roughnessMap = null; mt.metalnessMap = null; mt.metalness = 0.8; mt.roughness = 0.22; mt.envMapIntensity = 2.4; mt.emissive = new THREE.Color(0x6b4a10); mt.emissiveIntensity = 0.5; mt.needsUpdate = true; } } });   // polished gold, as shiny as the animals
-      const wrap = new THREE.Group();
-      wrap.add(o);
-      return wrap;
-    }));
-  }
-  return modelCache.get(name).then((w) => w.clone(true));
+  return preloadModel(name).then((g) => {
+    const o = g.scene.clone(true);
+    const box = new THREE.Box3().setFromObject(o);
+    const size = box.getSize(new THREE.Vector3());
+    o.scale.setScalar(height / size.y);
+    box.setFromObject(o);
+    const c = box.getCenter(new THREE.Vector3());
+    o.position.set(-c.x, -box.min.y, -c.z);
+    o.traverse((n) => { if (n.isMesh && n.material) { n.material.side = THREE.DoubleSide; n.material.envMapIntensity = 1.2; if (n.material.metalness != null) n.material.metalness = Math.max(n.material.metalness, 0.7);
+      if (name === "buddha") { const mt = n.material; mt.roughnessMap = null; mt.metalnessMap = null; mt.metalness = 0.8; mt.roughness = 0.22; mt.envMapIntensity = 2.4; mt.emissive = new THREE.Color(0x6b4a10); mt.emissiveIntensity = 0.5; mt.needsUpdate = true; } } });   // polished gold, as shiny as the animals
+    const wrap = new THREE.Group();
+    wrap.add(o);
+    return wrap;
+  });
 }
 
 // The eight birth-day posts. Wednesday is split into morning and afternoon (Rahu), as in Myanmar.
@@ -166,8 +170,8 @@ export function buildStupa(m, { plinth = true } = {}) {
   }
   const bellBase = y;
   const prof = new THREE.SplineCurve([
-    [0.86, 0], [0.86, 0.03], [0.8, 0.14], [0.68, 0.34], [0.55, 0.6], [0.44, 0.88],
-    [0.36, 1.14], [0.3, 1.38], [0.26, 1.58], [0.24, 1.74],
+    [1.06, 0], [1.07, 0.04], [1.03, 0.2], [0.94, 0.45], [0.82, 0.72], [0.68, 0.98],
+    [0.54, 1.22], [0.43, 1.42], [0.34, 1.58], [0.28, 1.68], [0.26, 1.74],
   ].map(([r, yy]) => new THREE.Vector2(r, yy))).getPoints(48);
   const bell = new THREE.Mesh(new THREE.LatheGeometry(prof, 56), m.gold);
   bell.position.y = bellBase;
@@ -490,6 +494,20 @@ export function buildCorner(m, day, font) {
   core.position.z = -0.45;
   for (const o of [...g.children]) if (o !== slab && o !== basin && o !== inner) core.add(o);
   g.add(core);
+  // a raised square of tiled marble in front of the corner, where people kneel and worship
+  const PW = 5.2, PD = 2.8, PHT = 0.26, PZ = 2.6;         // 13 x 7 tiles of 0.4: an odd count, so a whole tile sits in the middle
+  const wp = new THREE.Mesh(new THREE.BoxGeometry(PW, PHT, PD), m.marble);
+  wp.position.set(0, PHT / 2, PZ + PD / 2);
+  g.add(wp);
+  const wpEdge = new THREE.Mesh(new THREE.BoxGeometry(PW + 0.12, 0.05, PD + 0.12), m.goldDeep);   // gold trim around the top edge
+  wpEdge.position.set(0, PHT - 0.01, PZ + PD / 2);
+  g.add(wpEdge);
+  // square tiles (each texture repeat is 4 x 4 tiles of 0.4), laid out symmetrically about the centre line
+  const wpTop = new THREE.Mesh(new THREE.PlaneGeometry(PW, PD),
+    new THREE.MeshStandardMaterial({ map: tileTex([PW / 1.6, PD / 1.6]), roughness: 0.55 }));
+  wpTop.rotation.x = -Math.PI / 2;
+  wpTop.position.set(0, PHT + 0.03, PZ + PD / 2);
+  g.add(wpTop);
   // the silver table with its gold name plate replaces the drum and pillars
   loadModel("table", 2.07).then((t) => {
     core.add(t);
@@ -536,12 +554,12 @@ export function buildCorner(m, day, font) {
     g.userData.bell = pivot;
   }).catch(() => {});
 
-  setCornerDay(g, day, m, font);
+  setCornerDay(g, day, m, font, false);
   return g;
 }
 
 // Swap in the animal and name plate for another birth day
-export function setCornerDay(corner, day, m, font = corner.userData.font) {
+export function setCornerDay(corner, day, m, font = corner.userData.font, fetchModel = true) {
   const ud = corner.userData;
   ud.day = day;
   if (ud.animal) corner.remove(ud.animal);
@@ -549,7 +567,7 @@ export function setCornerDay(corner, day, m, font = corner.userData.font) {
   ud.animal.scale.multiplyScalar(0.85);
   ud.animal.position.set(0, 0.02, 1.0);
   corner.add(ud.animal);
-  if (MODELS.has(day.id)) {                       // swap in the real model once it has loaded
+  if (fetchModel && MODELS.has(day.id)) {         // (not for the first, placeholder build: the chosen day's file is fetched when it is chosen) swap in the real model once it has loaded
     loadModel(day.id, MODELS.get(day.id)).then((o) => {
       if (ud.day !== day) return;
       corner.remove(ud.animal);
@@ -579,7 +597,7 @@ const goldLeaf = (rx, ry) => {
     x.fillStyle = "rgba(120,75,10,0.6)";
     for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) for (const [dx, dy] of [[8, 8], [56, 8], [8, 56], [56, 56]]) { x.beginPath(); x.arc(i * 64 + dx, j * 64 + dy, 2.2, 0, 7); x.fill(); }
   }, [rx, ry]);
-  return new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: 1.2, color: 0xffe7a8, metalness: 0.85, roughness: 0.34 });
+  return new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: 1.2, color: 0xffe7a8, metalness: 0.7, roughness: 0.36, emissive: 0x6a4608, emissiveIntensity: 0.6 });   // glows like fresh gold leaf even on the shaded side
 };
 
 export function buildShwedagon(m) {
@@ -587,18 +605,34 @@ export function buildShwedagon(m) {
   const S = 31;                                   // the code-built stupa is ~3.4 tall, so this makes it ~105 m
   // seen from above the Shwedagon is not square: a grey octagonal platform, then gold terraces that step in with
   // notched (star-like) edges, then the round bell. Each terrace is two octagons turned by 22.5 degrees.
-  const PR = 66, PH = 2.0;                        // platform circumradius and height
-  const plat = new THREE.Mesh(new THREE.CylinderGeometry(PR, PR, PH, 8), new THREE.MeshStandardMaterial({ color: 0xc9c7ba, roughness: 0.75 }));
+  const PR = 92, PH = 2.0;                     // platform circumradius and height
+  // the platform is white marble, like the courtyard around it
+  const plat = new THREE.Mesh(new THREE.CylinderGeometry(PR, PR, PH, 8), new THREE.MeshStandardMaterial({ color: 0xece9e1, roughness: 0.55 }));
   plat.position.y = PH / 2; plat.rotation.y = Math.PI / 8; g.add(plat);
-  const STEPS = 9, SH = 0.8;
+  const STEPS = 9, SH = 1.5;                      // a tall stepped pyramid (about 13 m), as in the aerial photos
+  const stripe = new THREE.MeshStandardMaterial({ color: 0xb4501a, metalness: 0.55, roughness: 0.45 });   // the red-orange line between the gold-leaf steps
   for (let i = 0; i < STEPS; i++) {
-    const R = 59 - i * 1.3, y = PH + i * SH + SH / 2;
+    const R = 66 - i * 2.2, y = PH + i * SH + SH / 2;
     const a = new THREE.Mesh(new THREE.CylinderGeometry(R, R, SH, 8), goldLeaf(14, 1));
     a.position.y = y; a.rotation.y = Math.PI / 8; g.add(a);
+    const ln = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.006, R * 1.006, 0.13, 8), stripe);
+    ln.position.y = y - SH / 2 + 0.075; ln.rotation.y = Math.PI / 8; g.add(ln);
     const b = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.965, R * 0.965, SH, 8), goldLeaf(14, 1));
     b.position.y = y; g.add(b);
   }
   const topY = PH + STEPS * SH;
+  // small gold stupas standing on the corners and middles of the lowest and a middle terrace, as in the photos
+  const mini = buildStupa(m, { plinth: false });
+  for (const [si, hh] of [[0, 8], [4, 6.5]]) {
+    const R = (66 - si * 2.2) * 0.965, y = PH + (si + 1) * SH;
+    for (let k = 0; k < 16; k++) {
+      const a = k * Math.PI / 8 + Math.PI / 8 / 2 * 0;   // 8 corners and 8 mid-sides
+      const rr = k % 2 === 0 ? R : R * Math.cos(Math.PI / 8) * 0.99;
+      const s = mini.clone(true); s.scale.setScalar(hh / 3.4);
+      s.position.set(Math.sin(a) * rr, y, Math.cos(a) * rr);
+      g.add(s);
+    }
+  }
   const stupa = buildStupa(m, { plinth: false });
   const leaf = goldLeaf(10, 5);
   stupa.traverse((o) => { if (o.isMesh && o.material === m.gold) o.material = leaf; });
@@ -611,13 +645,13 @@ export function buildShwedagon(m) {
   const ap = PR * Math.cos(Math.PI / 8), L = 2 * PR * Math.sin(Math.PI / 8), off = ap - 4;
   for (let side = 0; side < 8; side++) {
     const th = side * Math.PI / 4, nx = Math.sin(th), nz = Math.cos(th), tx = Math.cos(th), tz = -Math.sin(th);
-    const main = side % 2 === 0, cnt = main ? 8 : 9;
+    const main = side % 2 === 0, cnt = main ? 10 : 9;
     for (let k = 0; k < cnt; k++) {
       const t = ((k + 0.5) / cnt - 0.5) * (L - 6);
-      if (main && (k === 3 || k === 4)) continue;  // room for the big one
-      slots.push({ x: nx * off + tx * t, z: nz * off + tz * t, rot: th, h: 11 });
+      if (main && k >= 3 && k <= 6) continue;      // room for the prayer hall in the middle of each main side
+      slots.push({ x: nx * off + tx * t, z: nz * off + tz * t, rot: th, h: 11, model: "shrine" });
     }
-    if (main) slots.push({ x: nx * (off - 3), z: nz * (off - 3), rot: th, h: 20 });
+    if (main) slots.push({ x: nx * (ap - 12), z: nz * (ap - 12), rot: th, h: 24, model: "hall" });   // gilded prayer hall with a large Buddha
   }
   const spare = buildStupa(m, { plinth: false });
   for (const s of slots) {
@@ -625,7 +659,7 @@ export function buildShwedagon(m) {
     slot.position.set(s.x, PH, s.z); slot.rotation.y = s.rot;
     const fb = spare.clone(true); fb.scale.setScalar(s.h / 3.4); slot.add(fb);
     g.add(slot);
-    loadModel("shrine", s.h).then((o) => { slot.remove(fb); slot.add(o); }).catch(() => {});
+    loadModel(s.model, s.h).then((o) => { slot.remove(fb); slot.add(o); }).catch(() => {});
   }
   return g;
 }
@@ -633,9 +667,12 @@ export function buildShwedagon(m) {
 export function buildBackdrop(m) {
   const g = new THREE.Group();
   const pagoda = buildShwedagon(m);
-  pagoda.position.set(0, -0.1, -70);              // the front edge of the platform is ~9 m behind the corner
+  pagoda.rotation.y = Math.PI / 8;                // turn a corner of the eight-sided base towards us: the weekday corner sits at one of the 8 corners
+  pagoda.position.set(0, -0.1, -95);              // that corner of the platform is ~3 m behind the weekday corner
   g.add(pagoda);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(420, 240), new THREE.MeshStandardMaterial({ color: 0xcfc6b2, roughness: 0.7 }));
+  // the courtyard is white marble slabs (about 1 m each), as in the aerial photos
+  const gTex = tileTex([105, 60]); gTex.anisotropy = 8;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(420, 240), new THREE.MeshStandardMaterial({ map: gTex, roughness: 0.55 }));
   ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.13, -100);   // the platform runs back under the pagoda
   g.add(ground);
   g.userData.stupa = pagoda.userData.stupa;

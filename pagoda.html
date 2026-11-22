@@ -5,7 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0d3228" />
   <title>ဘုရားဖူးကြမယ် · Myanmar Vibe</title>
-  <meta name="description" content="ရွှေတိဂုံဘုရားကို သင့်စားပွဲပေါ်မှာ တင်ပြီး မွေးနေ့ထောင့်မှာ ရေလောင်း ဆီမီးထွန်း ပန်းလှူ ခေါင်းလောင်းတီး ဘုရားဖူးပါ။" />
+  <meta name="description" content="ရွှေတိဂုံဘုရားကို သင့်စားပွဲပေါ်မှာ တင်ပြီး မွေးနေ့ထောင့်မှာ ရေသပ္ပါယ် ဆီမီးပူဇော် ပန်းကပ်လှူ ခေါင်းလောင်းထိုး ဘုရားဖူးပါ။" />
+  <link rel="canonical" href="https://pocket-myanmar.vercel.app/pagoda.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Myanmar Vibe" />
+  <meta property="og:title" content="ဘုရားဖူးကြမယ် · Myanmar Vibe" />
+  <meta property="og:description" content="ရွှေတိဂုံဘုရားကို သင့်စားပွဲပေါ်မှာ တင်ပြီး မွေးနေ့ထောင့်မှာ ဘုရားဖူးပါ။ Shwedagon Pagoda in AR on your table." />
+  <meta property="og:url" content="https://pocket-myanmar.vercel.app/pagoda.html" />
+  <meta property="og:image" content="https://pocket-myanmar.vercel.app/og-pagoda.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ဘုရားဖူးကြမယ် · Myanmar Vibe" />
+  <meta name="twitter:image" content="https://pocket-myanmar.vercel.app/og-pagoda.png" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" />
   <link rel="icon" href="logo.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -53,11 +67,12 @@
       <div class="intro" id="intro">
         <div class="intro-card">
           <h1>ဘုရားဖူးကြမယ်</h1>
-          <p>ရွှေတိဂုံ နောက်ခံနဲ့ သင့်မွေးနေ့ ထောင့်ကို စားပွဲပေါ်မှာ တင်ပြီး တိရစ္ဆာန်ကို ရေလောင်း၊ ဆီမီးထွန်း၊ ပန်းလှူ၊ ခေါင်းလောင်းတီးပါ။</p>
+          <p>ရွှေတိဂုံ နောက်ခံနဲ့ သင့်မွေးနေ့ ထောင့်ကို စားပွဲပေါ်မှာ တင်ပြီး တိရစ္ဆာန်ကို ရေသပ္ပါယ်၊ ဆီမီးပူဇော်၊ ပန်းကပ်လှူ၊ ခေါင်းလောင်းထိုးပါ။</p>
           <p class="pick-label" id="pickLabel">မွေးနေ့ ရွေးပါ</p>
           <div class="days" id="days" role="radiogroup" aria-labelledby="pickLabel"></div>
           <button id="btnStart" class="btn primary" disabled>စမယ်</button>
-          <p class="fine">စားပွဲ ဒါမှမဟုတ် စင်မြင့်ပေါ်မှာသာ တင်ပါ။ မြေပြင်ပေါ် မတင်ပါနဲ့။ ကင်မရာကို သင့်ဖုန်းထဲမှာပဲ သုံးပါတယ်၊ ဘာမှ ပြင်ပကို မပို့ပါဘူး။</p>
+          <div class="loadbar" id="loadbar" role="progressbar" aria-label="ဘုရား ပြင်ဆင်နေပါတယ်" hidden><i></i></div>
+          <p class="fine">စားပွဲ ဒါမှမဟုတ် စင်မြင့်ပေါ်မှာသာ တင်ပါ။ မြေပြင်ပေါ် မတင်ပါနဲ့။ စမယ်ကို နှိပ်ရင် ကင်မရာနဲ့ ဖုန်းလှုပ်ရှားမှု sensor ကို ခွင့်တောင်းပါမယ်။ ကင်မရာကို သင့်ဖုန်းထဲမှာပဲ သုံးပါတယ်၊ ဘာမှ ပြင်ပကို မပို့ပါဘူး။ <a href="privacy.html">ကိုယ်ရေးအချက်အလက်</a></p>
         </div>
       </div>
 

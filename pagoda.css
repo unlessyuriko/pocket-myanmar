@@ -92,3 +92,8 @@ html:has(.pagoda.xr), body:has(.pagoda.xr), .pagoda.xr, .pagoda.xr .stage { back
 .pagoda .intro-card { max-width: 360px; }
 @media (max-height: 700px) { .day { min-height: 64px; } .day .em { font-size: 22px; } .hint { bottom: 84px; } }
 @media (max-width: 359px) { .days { grid-template-columns: repeat(4, 1fr); gap: 5px; } .day .dn { font-size: 10.5px; } }
+
+/* download progress under the Start button */
+.loadbar { width: 70%; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.loadbar[hidden] { display: none; }
+.loadbar i { display: block; height: 100%; width: 100%; transform-origin: left; transform: scaleX(var(--p, 0)); background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi)); transition: transform 0.25s ease; }

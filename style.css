@@ -337,3 +337,10 @@ button { font: inherit; color: inherit; }
   .intro .btn { width: 100%; min-width: 0; min-height: 42px; }
   .sheet-card img { max-height: 58dvh; }
 }
+
+/* notices at the top of the intro card (in-app browser, no 3D) */
+.guard { padding: 10px 12px; border-radius: 12px; font-size: 13.5px; line-height: 1.7; text-align: left; width: 100%; box-sizing: border-box; }
+.guard.warn { background: rgba(227, 184, 92, 0.16); border: 1px solid var(--ring); color: #fff0c2; }
+.guard.bad { background: rgba(190, 60, 50, 0.25); border: 1px solid rgba(255, 140, 120, 0.5); color: #ffd9d2; }
+.guard .linkbtn { margin-top: 6px; padding: 6px 12px; min-height: 36px; border-radius: 999px; border: 1px solid var(--ring); background: rgba(6, 30, 24, 0.7); color: var(--gold-hi); font: inherit; cursor: pointer; }
+.intro .fine a { color: var(--gold-hi); text-decoration: underline; }
