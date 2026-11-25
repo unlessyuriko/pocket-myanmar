@@ -379,28 +379,28 @@ const Sound = (() => {
     pour(len = 3.6) {
       const c = get(); if (!c) return; const t = c.currentTime + 0.25;
       const out = c.createGain(); out.gain.setValueAtTime(0, t);
-      out.gain.linearRampToValueAtTime(1, t + 0.9); out.gain.setValueAtTime(1, t + len - 1.1); out.gain.linearRampToValueAtTime(0, t + len);
-      const echo = c.createDelay(); echo.delayTime.value = 0.27;
+      out.gain.linearRampToValueAtTime(1, t + 1.4); out.gain.setValueAtTime(1, t + len - 1.6); out.gain.linearRampToValueAtTime(0, t + len);
+      const echo = c.createDelay(); echo.delayTime.value = 0.4;
       const fb = c.createGain(); fb.gain.value = 0.3;
-      const damp = c.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 1500;
+      const damp = c.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 800;
       out.connect(c.destination); out.connect(echo); echo.connect(damp); damp.connect(fb); fb.connect(echo); damp.connect(c.destination);
       // the stream: soft brown noise (no high hiss), kept low and drifting a little
       const n = Math.ceil(c.sampleRate * (len + 0.5)), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
       let last = 0;
       for (let i = 0; i < n; i++) { last = last * 0.985 + (Math.random() * 2 - 1) * 0.015; d[i] = last * 7; }
       const src = c.createBufferSource(); src.buffer = buf;
-      const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 520; bp.Q.value = 0.6;
-      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1100;
-      const sg = c.createGain(); sg.gain.value = 0.2;
-      const lfo = c.createOscillator(), la = c.createGain(); lfo.frequency.value = 0.7; la.gain.value = 0.05; lfo.connect(la).connect(sg.gain); lfo.start(t); lfo.stop(t + len + 0.2);
+      const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 380; bp.Q.value = 0.5;
+      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 650;
+      const sg = c.createGain(); sg.gain.value = 0.05;                                   // very soft, like a slow wave rolling in and out
+      const lfo = c.createOscillator(), la = c.createGain(); lfo.frequency.value = 0.3; la.gain.value = 0.02; lfo.connect(la).connect(sg.gain); lfo.start(t); lfo.stop(t + len + 0.2);
       src.connect(bp).connect(lp).connect(sg).connect(out); src.start(t); src.stop(t + len + 0.3);
       // drops: round little "plip" notes, quiet and unhurried
-      const drops = Math.round(len * 5);
+      const drops = Math.round(len * 1.6);
       for (let i = 0; i < drops; i++) {
-        const dt = t + 0.5 + Math.random() * (len - 1.2), f = rnd(520, 1100), dl = rnd(0.07, 0.13);
+        const dt = t + 0.8 + Math.random() * (len - 2), f = rnd(380, 720), dl = rnd(0.12, 0.2);
         const o = c.createOscillator(), g = c.createGain(), p = pan(c, out, rnd(-0.4, 0.4));
         o.type = "sine"; o.frequency.setValueAtTime(f, dt); o.frequency.exponentialRampToValueAtTime(f * 1.5, dt + dl * 0.7);
-        g.gain.setValueAtTime(0, dt); g.gain.linearRampToValueAtTime(rnd(0.012, 0.028), dt + 0.012); g.gain.exponentialRampToValueAtTime(0.0005, dt + dl);
+        g.gain.setValueAtTime(0, dt); g.gain.linearRampToValueAtTime(rnd(0.004, 0.01), dt + 0.03); g.gain.exponentialRampToValueAtTime(0.0005, dt + dl);
         o.connect(g).connect(p); o.start(dt); o.stop(dt + dl + 0.05);
       }
     },
