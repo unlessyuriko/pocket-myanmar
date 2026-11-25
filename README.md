@@ -57,6 +57,7 @@ Phones only allow camera access on **https** links. Host the folder on any stati
 - `blend.js`: WebGL shader that blends the paste into the skin using its light and shadow
 - `pagoda.html`, `pagoda.css`, `pagoda.js`, `pagoda-model.js`: the pagoda feature (page, scene and interaction, and the 3D shapes). Add `?debug` to the address to expose `window.__pagoda` for testing.
 - `guard.js`: warns when the page is opened inside Facebook / Messenger / Instagram / TikTok's own browser (camera often blocked) with a copy-link button, and when WebGL is missing
+- `brand.js`, `brand/`: MY Technomad branding: a "Made by" footer on the start screens and the photo sheet, and the logo stamped on shared photos, videos and the pagoda card. Set `SITE_URL` and `CONTACT_URL` in `brand.js` to turn on the logo link and the "Work with us" button.
 - `privacy.html`: privacy note (Burmese and English)
 - `og-image.png`, `og-pagoda.png`: share-preview pictures (1200×630) for the Open Graph tags. The tags use `https://pocket-myanmar.vercel.app`; change it in `index.html` and `pagoda.html` when there is a custom domain.
 - `vercel.json`: security headers and cache rules (models cached a week, scripts revalidated)

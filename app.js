@@ -6,6 +6,8 @@ import { createFx, readFace } from "./fx.js";
 import { createBlender } from "./blend.js";
 import { createOccluder } from "./occlude.js";
 import { showGuards } from "./guard.js";
+import { mountBrand, SHARE_URL } from "./brand.js";
+mountBrand();
 showGuards();                                  // warns when opened inside Facebook / Messenger's own browser
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
@@ -495,7 +497,7 @@ function cameraErrorMessage(err) {
       return "ကင်မရာကို ခွင့်မပြုထားပါ။ ခွင့်ပြုပြီး “ကင်မရာဖွင့်မယ်” ကို ထပ်နှိပ်ပါ။";
     case "NotFoundError":
     case "OverconstrainedError":
-      return "ကင်မရာ မတွေ့ပါ။ “ဓာတ်ပုံရွေးမယ်” ကို သုံးကြည့်ပါ။";
+      return "ကင်မရာ မတွေ့ပါ။ “ဓာတ်ပုံထဲမှာ သနပ်ခါး လိမ်းမယ်” ကို သုံးကြည့်ပါ။";
     case "NotReadableError":
       return "တခြားအက်ပ်က ကင်မရာကို သုံးနေပါတယ်။ ပိတ်ပြီး ထပ်ကြိုးစားပါ။";
     default:
@@ -538,6 +540,7 @@ async function startCamera(facing = "user") {
       toast("ကင်မရာ ပြောင်းမရပါ", 4000);
     } else {
       toast(cameraErrorMessage(err));   // stays on screen until the next try
+      $("#btnPhotoFallback").hidden = false;   // no camera: offer a photo from the gallery instead
     }
     return;
   }
@@ -624,6 +627,7 @@ function enterApp() {
 
 $("#btnCamera").onclick = () => startCamera("user");
 $("#btnFlip").onclick = () => !rec && startCamera(state.facing === "user" ? "environment" : "user");
+$("#btnPhotoFallback").onclick = () => $("#filePhoto").click();
 $("#filePhoto").onchange = (e) => {
   const f = e.target.files && e.target.files[0];
   if (f) startPhoto(URL.createObjectURL(f));
@@ -754,10 +758,11 @@ function startRecording() {
   const text = "Myanmar Vibe · သနပ်ခါး";
   const wg = wm.getContext("2d");
   wg.font = `600 ${fs}px "Noto Sans Myanmar", "Myanmar Text", sans-serif`;
-  wm.width = Math.ceil(wg.measureText(text).width + fs * 1.4);
+  const tw = wg.measureText(text).width;
+  wm.width = Math.ceil(tw + fs * 1.4);
   wm.height = Math.ceil(fs * 2.6);
   wg.font = `600 ${fs}px "Noto Sans Myanmar", "Myanmar Text", sans-serif`;
-  wg.fillStyle = "rgba(6,32,26,0.6)";
+  wg.fillStyle = "rgba(26, 26, 26, 0.6)";
   wg.beginPath();
   wg.roundRect ? wg.roundRect(0, 0, wm.width, wm.height, fs * 1.3) : wg.rect(0, 0, wm.width, wm.height);
   wg.fill();
@@ -818,7 +823,8 @@ $("#btnShare").onclick = async () => {
   if (!lastBlob) return;
   const file = new File([lastBlob], lastName, { type: lastType });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: "Myanmar Vibe", text: "သနပ်ခါး လိမ်းထားတယ် 🌼" }); } catch {}
+    try { await navigator.share({ files: [file], title: "Myanmar Vibe", text: `သနပ်ခါး လိမ်းထားတယ် 🌼
+${SHARE_URL()}` }); } catch {}
   } else {
     $("#btnSave").click();
   }

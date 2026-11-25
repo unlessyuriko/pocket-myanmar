@@ -13,15 +13,16 @@ gltf.setMeshoptDecoder(MeshoptDecoder);
 const rawCache = new Map();
 const MODELS = new Map([["mon", 1.45], ["tue", 1.45], ["wed", 1.6], ["rahu", 1.6], ["thu", 1.4], ["fri", 1.5], ["sat", 1.6], ["sun", 1.7]]);       // birth-day id -> height in corner units
 export const DAY_MODEL_HEIGHT = (id) => MODELS.get(id);
-export const SHARED_MODELS = ["buddha", "table", "bellframe", "bell", "shrine", "hall"];     // every birth day uses these
+export const SHARED_MODELS = ["buddha", "table", "bellframe", "bell", "shrine", "hall", "stupa", "vase", "gandama"];     // every birth day uses these
 // Starts downloading a file (once) and returns the loaded glTF; loadModel then only has to scale a copy.
 export function preloadModel(name) {
   if (!rawCache.has(name)) rawCache.set(name, gltf.loadAsync(`models/${name}.glb`));
   return rawCache.get(name);
 }
-export function loadModel(name, height) {
+export function loadModel(name, height, prep) {
   return preloadModel(name).then((g) => {
     const o = g.scene.clone(true);
+    if (prep) prep(o);
     const box = new THREE.Box3().setFromObject(o);
     const size = box.getSize(new THREE.Vector3());
     o.scale.setScalar(height / size.y);
@@ -37,16 +38,8 @@ export function loadModel(name, height) {
 }
 
 // The eight birth-day posts. Wednesday is split into morning and afternoon (Rahu), as in Myanmar.
-export const DAYS = [
-  { id: "mon", day: "တနင်္လာ", animal: "ကျား", emoji: "🐯" },
-  { id: "tue", day: "အင်္ဂါ", animal: "ခြင်္သေ့", emoji: "🦁" },
-  { id: "wed", day: "ဗုဒ္ဓဟူး", animal: "ဆင်", emoji: "🐘" },
-  { id: "rahu", day: "ရာဟု", animal: "ဆင် (အစွယ်မဲ့)", emoji: "🐘" },
-  { id: "thu", day: "ကြာသပတေး", animal: "ကြွက်", emoji: "🐭" },
-  { id: "fri", day: "သောကြာ", animal: "ပူး", emoji: "🐹" },
-  { id: "sat", day: "စနေ", animal: "နဂါး", emoji: "🐉" },
-  { id: "sun", day: "တနင်္ဂနွေ", animal: "ဂဠုန်", emoji: "🦅" },
-];
+import { DAYS } from "./days.js";
+export { DAYS };
 
 // ---------- painted textures ----------
 function canvasTex(w, h, draw, repeat) {
@@ -449,13 +442,22 @@ export function buildCorner(m, day, font) {
   buddha.position.set(0, TABLE_Y + 0.04 + 0.44 * 0.8 - 0.02, 0);
   g.add(buddha);
 
-  // offering bowl for flowers (right) and a water cup (left) on the drum's rim
-  const flowerBowl = lathe([[0, 0], [0.18, 0], [0.24, 0.07], [0.26, 0.11], [0.22, 0.11], [0.16, 0.04], [0, 0.03]], 24, m.gold);
-  flowerBowl.position.set(0.72, TABLE_Y + 0.04, 0.5);
-  g.add(flowerBowl);
-  const cup = lathe([[0, 0], [0.07, 0], [0.1, 0.16], [0.11, 0.24], [0.09, 0.24], [0.07, 0.14], [0, 0.02]], 20, m.gold);
-  cup.position.set(-0.72, TABLE_Y + 0.04, 0.5);
-  g.add(cup);
+  // three golden cups in front of the Buddha; the water offering fills them
+  const cupProfile = [[0, 0], [0.07, 0], [0.1, 0.16], [0.11, 0.24], [0.09, 0.24], [0.07, 0.14], [0, 0.02]];
+  const CUP_S = 0.78, CUP_X = [-0.24, 0, 0.24], CUP_Z = 0.5, FILL = 0.2 * CUP_S;
+  const waterMat = new THREE.MeshStandardMaterial({ color: 0xa9dcff, transparent: true, opacity: 0.8, roughness: 0.05, metalness: 0.15, emissive: 0x2a5f86, emissiveIntensity: 0.35 });
+  const cups = CUP_X.map((x) => {
+    const c = lathe(cupProfile, 24, m.gold);
+    c.scale.setScalar(CUP_S);
+    c.position.set(x, TABLE_Y + 0.04, CUP_Z);
+    g.add(c);
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.088 * CUP_S, 0.074 * CUP_S, FILL, 24), waterMat);
+    w.position.set(x, TABLE_Y + 0.04 + 0.02, CUP_Z);
+    w.scale.y = 0.001; w.visible = false;
+    g.add(w);
+    return { water: w, x, base: TABLE_Y + 0.04 + 0.02, fill: FILL, top: TABLE_Y + 0.04 + 0.24 * CUP_S };
+  });
+  const flowerBowlPos = new THREE.Vector3(0.72, TABLE_Y + 0.04, 0.5);
 
   // two lamps, off until you light them
   const flames = [];
@@ -532,10 +534,26 @@ export function buildCorner(m, day, font) {
     core.add(o);
     bowl.visible = false; buddha.visible = false;
   }).catch(() => {});
+  // a slim golden vase on each side of the Buddha; the white gandama flowers appear in them when you offer flowers
+  const VASE_H = 0.95, BUNCH_H = 0.8;
+  Promise.all([loadModel("vase", VASE_H), loadModel("gandama", BUNCH_H)]).then(([vase, bunch]) => {
+    const ud = g.userData;
+    ud.bunches = [];
+    for (const sx of [-1, 1]) {
+      const v = sx === -1 ? vase : vase.clone(true);
+      v.position.set(sx * 0.68, TABLE_Y + 0.04, 0.12);
+      const b = sx === -1 ? bunch : bunch.clone(true);
+      b.position.set(sx * 0.68, TABLE_Y + 0.04 + VASE_H * 0.7, 0.12);
+      b.rotation.y = sx * 0.6;
+      b.visible = !!ud.bunchesOn;
+      core.add(v, b);
+      ud.bunches.push(b);
+    }
+  }).catch(() => {});
 
   g.userData = {
-    day, plate, buddha, flames, light, cup, bell: pivot, flowers: [], animal: null,
-    bowlPos: flowerBowl.position.clone().add(new THREE.Vector3(0, 0, -0.45)), font,
+    day, plate, buddha, flames, light, cups, bell: pivot, flowers: [], animal: null,
+    bowlPos: flowerBowlPos.clone().add(new THREE.Vector3(0, 0, -0.45)), cupZ: CUP_Z - 0.45, font,
   };
   // the silver bell and its holder: two real models, so the bell can swing on its chain from the hook
   const FRAME_H = 2.2, BELL_H = FRAME_H * 0.6, HOOK = 0.786;
@@ -621,24 +639,13 @@ export function buildShwedagon(m) {
     b.position.y = y; g.add(b);
   }
   const topY = PH + STEPS * SH;
-  // small gold stupas standing on the corners and middles of the lowest and a middle terrace, as in the photos
-  const mini = buildStupa(m, { plinth: false });
-  for (const [si, hh] of [[0, 8], [4, 6.5]]) {
-    const R = (66 - si * 2.2) * 0.965, y = PH + (si + 1) * SH;
-    for (let k = 0; k < 16; k++) {
-      const a = k * Math.PI / 8 + Math.PI / 8 / 2 * 0;   // 8 corners and 8 mid-sides
-      const rr = k % 2 === 0 ? R : R * Math.cos(Math.PI / 8) * 0.99;
-      const s = mini.clone(true); s.scale.setScalar(hh / 3.4);
-      s.position.set(Math.sin(a) * rr, y, Math.cos(a) * rr);
-      g.add(s);
-    }
-  }
   const stupa = buildStupa(m, { plinth: false });
   const leaf = goldLeaf(10, 5);
   stupa.traverse((o) => { if (o.isMesh && o.material === m.gold) o.material = leaf; });
   stupa.scale.setScalar(S); stupa.position.y = topY;
   g.add(stupa);
   g.userData.stupa = stupa;
+  swapInModelStupa(stupa);
   // the ring of 64 shrine-stupas along the edge of the octagonal platform: a large one in the middle of each of the
   // four main sides, smaller ones in a row on every side
   const slots = [];
@@ -662,6 +669,27 @@ export function buildShwedagon(m) {
     loadModel(s.model, s.h).then((o) => { slot.remove(fb); slot.add(o); }).catch(() => {});
   }
   return g;
+}
+
+
+// The stupa itself (terraces, bell, lotus bands, spire, hti) is a generated 3D model made from the real photos, with its
+// own 2048 px texture; the platform, shrine-stupas, prayer halls and big terraces below it are the crisp code-built ones.
+const STUPA_H = 100;                               // metres from the top terrace to the tip of the hti
+function swapInModelStupa(stupa) {
+  loadModel("stupa", STUPA_H).then((o) => {
+    o.traverse((n) => { if (n.isMesh && n.material) {
+      const mt = n.material;
+      mt.metalness = 0.8; mt.roughness = 0.3; mt.metalnessMap = null; mt.roughnessMap = null; mt.envMapIntensity = 2.4;   // polished gold like the Buddha and the animals
+      mt.color = new THREE.Color(0xfff0c0);                                                    // keeps the photo's gold-leaf colour, a little warmer
+      if (mt.map) { mt.emissiveMap = mt.map; mt.emissive = new THREE.Color(0xd9a21c); mt.emissiveIntensity = 0.75; }   // glows like fresh gold leaf even on the shaded side
+      mt.needsUpdate = true;
+    } });
+    const jewel = stupa.userData.jewel;
+    for (const k of [...stupa.children]) if (k !== jewel) stupa.remove(k);          // drop the code-built bell and spire
+    jewel.position.y = (STUPA_H - 3) / stupa.scale.y;                               // jewel glow at the tip of the model
+    o.scale.multiplyScalar(1 / stupa.scale.y);                                      // the model is in metres, the stupa group is scaled
+    stupa.add(o);
+  }).catch(() => {});                                                               // keep the code-built stupa
 }
 
 export function buildBackdrop(m) {

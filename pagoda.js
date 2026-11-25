@@ -5,6 +5,9 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { DAYS, makeMaterials, buildCorner, setCornerDay, buildBackdrop, TABLE_Y, addFlowers, glowTexture, preloadModel, SHARED_MODELS } from "./pagoda-model.js";
 import { showGuards } from "./guard.js";
+import { iconSvg } from "./icons.js";
+import { mountBrand, SHARE_URL } from "./brand.js";
+mountBrand();
 
 const $ = (s) => document.querySelector(s);
 if (showGuards({ needsWebGL: true }).blocked) throw new Error("WebGL is not available");     // the message is already on screen; Start stays off
@@ -23,7 +26,7 @@ const S = {
   xr: false,                   // true while the phone's own AR (WebXR) tracks the surface
   hasCam: false,
   scale: 0.12,
-  done: { water: false, lamp: false, flower: false, bell: false },
+  done: { bless: false, water: false, lamp: false, flower: false, bell: false },
   sadhuShown: false,
   yaw: 0, pitch: -0.5,         // look direction when there are no motion sensors (desktop)
 };
@@ -125,7 +128,7 @@ async function buildTheCorner() {
   const i = S.dayIdx != null ? S.dayIdx : savedDay != null && DAYS[savedDay] ? savedDay : 0;
   corner = buildCorner(mats, DAYS[i], FONT);
   pagoda.add(corner);
-  corner.add(kettle, drops);
+  corner.add(kettle, dipper, drops);
   if (S.dayIdx != null) selectDay(S.dayIdx, true);
 }
 
@@ -142,7 +145,12 @@ const kettle = new THREE.Group();
   kettle.scale.setScalar(3);
   kettle.visible = false;
 }
+// the golden cup used to bless the Buddha image and then the day animal
+const dipper = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.07, 0], [0.1, 0.16], [0.11, 0.24], [0.09, 0.24], [0.07, 0.14], [0, 0.02]].map(([x, y]) => new THREE.Vector2(x, y)), 24), mats.gold);
+dipper.material = mats.gold.clone(); dipper.material.side = THREE.DoubleSide;
+dipper.scale.setScalar(1.5); dipper.visible = false;
 const DROPS = 70;
+const dropStop = new Float32Array(DROPS).fill(0.08);
 const dropPos = new Float32Array(DROPS * 3), dropVel = new Float32Array(DROPS * 3), dropLife = new Float32Array(DROPS);
 const dropGeo = new THREE.BufferGeometry();
 dropGeo.setAttribute("position", new THREE.BufferAttribute(dropPos, 3));
@@ -158,7 +166,7 @@ drops.frustumCulled = false;
 dropPos.fill(-100);
 buildTheCorner();
 
-let pour = null, swing = null, popping = [];
+let pour = null, bless = null, swing = null, popping = [];
 
 function applyTime() {
   const t = yangon();
@@ -389,7 +397,7 @@ DAYS.forEach((d, i) => {
   const b = document.createElement("button");
   b.className = "day"; b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", "false");
   b.dataset.i = i;
-  b.innerHTML = `<span class="em" aria-hidden="true">${d.emoji}</span><span class="dn">${d.day}</span>`;
+  b.innerHTML = `<span class="em" aria-hidden="true">${iconSvg(d.id)}</span><span class="dn">${d.day}</span>`;
   b.setAttribute("aria-label", `${d.day}၊ ${d.animal}`);
   b.onclick = () => { pickDay(i); };
   daysEl.append(b);
@@ -413,7 +421,11 @@ function pickDay(i) {
   daysEl.querySelectorAll(".day").forEach((b) => b.setAttribute("aria-checked", String(+b.dataset.i === i)));
   $("#btnStart").disabled = false;
 }
-if (savedDay != null && DAYS[savedDay]) pickDay(savedDay);
+if (savedDay != null && DAYS[savedDay]) {
+  pickDay(savedDay);                                  // chosen on the start page: just confirm it
+  $(".intro-card").classList.add("known");
+  $("#pickLabel").textContent = "သင့်နေ့နံ — မှန်ရင် စမယ်ကို နှိပ်ပါ";
+}
 
 let changingDay = false;
 function selectDay(i, instant = false) {
@@ -428,8 +440,11 @@ function selectDay(i, instant = false) {
   ud.light.intensity = 0;
   ud.flowers.forEach((f) => { corner.remove(f); f.geometry.dispose(); f.material.dispose(); });
   ud.flowers.length = 0;
-  kettle.visible = false;
-  S.done = { water: false, lamp: false, flower: false, bell: false };
+  ud.bunchesOn = false;
+  (ud.cups || []).forEach((c) => { c.water.visible = false; c.water.scale.y = 0.001; c.water.position.y = c.base; });
+  (ud.bunches || []).forEach((b) => (b.visible = false));
+  kettle.visible = false; dipper.visible = false; bless = null;
+  S.done = { bless: false, water: false, lamp: false, flower: false, bell: false };
   S.sadhuShown = false;
   refreshOfferButtons();
   faceYawTarget(instant);
@@ -491,9 +506,12 @@ async function startXR() {
   } catch { return false; }
 }
 // background sound on / off
+const SPK = (extra) => `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/>${extra}</svg>`;
+const SPK_ON = SPK('<path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>');
+const SPK_OFF = SPK('<path d="m16 9.5 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>');
 const soundBtn = $("#btnSound");
 const showSound = () => {
-  soundBtn.textContent = Sound.muted ? "🔇" : "🔊";
+  soundBtn.innerHTML = Sound.muted ? SPK_OFF : SPK_ON;
   soundBtn.setAttribute("aria-pressed", String(!Sound.muted));
   soundBtn.setAttribute("aria-label", Sound.muted ? "နောက်ခံအသံ ဖွင့်မယ်" : "နောက်ခံအသံ ပိတ်မယ်");
 };
@@ -515,13 +533,13 @@ function enterWorship() {
 }
 function refreshOfferButtons() {
   const on = S.phase === "worship";
-  for (const [id, key] of [["#offWater", "water"], ["#offLamp", "lamp"], ["#offFlower", "flower"], ["#offBell", "bell"]]) {
+  for (const [id, key] of [["#offBless", "bless"], ["#offWater", "water"], ["#offLamp", "lamp"], ["#offFlower", "flower"], ["#offBell", "bell"]]) {
     $(id).disabled = !on;
     $(id).classList.toggle("done", S.done[key]);
   }
 }
 function showChips() {
-  $("#chips").hidden = false;
+  $("#chips").hidden = true;                      // no place / time / merit chips over the camera
   const s = streak();
   $("#chipMerit").textContent = merit.total ? `ကုသိုလ် ${mm(merit.total)}${s > 1 ? ` · ${mm(s)} ရက်ဆက်` : ""}` : "";
 }
@@ -556,9 +574,16 @@ function sadhu() {
   if (corner) for (let i = 0; i < 24; i++) spawnSpark();
 }
 
+$("#offBless").onclick = () => {
+  if (pour || bless || !S.corner) return;
+  bless = { t: 0, dur: 6.4, acc: 0 };
+  dipper.visible = true;
+  Sound.pour();
+  offered("bless");
+};
 $("#offWater").onclick = () => {
-  if (pour || !S.corner) return;
-  pour = { t: 0, dur: 2.6, acc: 0 };
+  if (pour || bless || !S.corner) return;
+  pour = { t: 0, dur: 4.2, acc: 0 };
   kettle.visible = true;
   Sound.pour();
   offered("water");
@@ -573,6 +598,14 @@ $("#offLamp").onclick = () => {
 };
 $("#offFlower").onclick = () => {
   if (!S.corner) return;
+  const bunches = S.corner.userData.bunches;
+  if (bunches && bunches.length) {                      // white gandama appear in the two golden vases
+    S.corner.userData.bunchesOn = true;
+    bunches.forEach((b, i) => { if (!b.visible) { b.visible = true; b.userData.s = new THREE.Vector3(1, 1, 1); b.scale.setScalar(0.001); popping.push({ f: b, t: -i * 0.15 }); } });
+    Sound.petals();
+    offered("flower");
+    return;
+  }
   const before = S.corner.userData.flowers.length;
   addFlowers(S.corner, 6);
   const fresh = S.corner.userData.flowers.slice(before);
@@ -683,7 +716,7 @@ $("#btnStart").onclick = async () => {
 $("#btnReplace").onclick = () => {
   S.phase = "place"; S.placed = false; world.visible = false;
   setHint(S.xr ? "ဖုန်းကို စားပွဲဆီ ညွှန်ပြီး စက်ဝိုင်းပေါ်မှာ တစ်ချက်ထိပါ" : "နေရာအသစ်မှာ တစ်ချက်ထိပြီး တင်ပါ");
-  for (const id of ["#offWater", "#offLamp", "#offFlower", "#offBell"]) $(id).disabled = true;
+  for (const id of ["#offBless", "#offWater", "#offLamp", "#offFlower", "#offBell"]) $(id).disabled = true;
 };
 $("#btnDay").onclick = () => {
   changingDay = true;
@@ -713,14 +746,14 @@ async function capture() {
   // caption strip along the bottom
   const u = W / 390, sh = 118 * u;
   const g = x.createLinearGradient(0, H - sh, 0, H);
-  g.addColorStop(0, "rgba(4,24,19,0)"); g.addColorStop(0.45, "rgba(4,24,19,0.82)"); g.addColorStop(1, "rgba(4,24,19,0.95)");
+  g.addColorStop(0, "rgba(23, 23, 23, 0)"); g.addColorStop(0.45, "rgba(23, 23, 23, 0.82)"); g.addColorStop(1, "rgba(23, 23, 23, 0.95)");
   x.fillStyle = g; x.fillRect(0, H - sh, W, sh);
   x.textAlign = "center";
   const d = DAYS[S.dayIdx];
   x.fillStyle = "#f7de9a"; x.font = `700 ${22 * u}px ${FONT}`;
   x.fillText("ဒီနေ့ ဘုရားဖူးပြီးပါပြီ 🙏", W / 2, H - 62 * u, W - 24 * u);
   x.fillStyle = "#f9eed8"; x.font = `400 ${15 * u}px ${FONT}`;
-  x.fillText(`${d.day} ${d.animal} ${d.emoji}${merit.total ? `  ·  ကုသိုလ် ${mm(merit.total)}` : ""}`, W / 2, H - 36 * u, W - 24 * u);
+  x.fillText(`${d.day} ${d.animal}${merit.total ? `  ·  ကုသိုလ် ${mm(merit.total)}` : ""}`, W / 2, H - 36 * u, W - 24 * u);
   x.fillStyle = "#e3b85c"; x.font = `700 ${13 * u}px "Playfair Display", Georgia, serif`;
   x.fillText("Myanmar Vibe", W / 2, H - 13 * u);
   return out;
@@ -737,7 +770,8 @@ $("#btnShutter").onclick = async () => {
 $("#btnBack").onclick = () => { $("#result").hidden = true; };
 $("#btnShare").onclick = async () => {
   try {
-    if (navigator.canShare && navigator.canShare({ files: [shot] })) await navigator.share({ files: [shot], text: "ဒီနေ့ ဘုရားဖူးပြီးပါပြီ 🙏" });
+    if (navigator.canShare && navigator.canShare({ files: [shot] })) await navigator.share({ files: [shot], text: `ဒီနေ့ ဘုရားဖူးပြီးပါပြီ 🙏
+${SHARE_URL()}` });
     else $("#btnSave").click();
   } catch { /* cancelled */ }
 };
@@ -802,31 +836,61 @@ function frame(now, xrFrame) {
   drops.material.size = 0.3 * S.scale;
   if (pour && S.corner) {
     pour.t += dt;
-    const p = pour.t / pour.dur;
-    const tilt = Math.min(1, p * 4, (1 - p) * 4);
-    const KX = 0.62, KZ = 1.0, ang = tilt * 0.75, K = 3;
-    kettle.position.set(KX, 1.72, KZ);
+    const p = Math.min(1, pour.t / pour.dur), cups = S.corner.userData.cups, n = cups.length;
+    const k = Math.min(n - 1, Math.floor(p * n)), local = p * n - k;            // which cup, and how far through it
+    const c = cups[k];
+    const tilt = Math.min(1, local * 5, (1 - local) * 5 + 0.0001);
+    const ang = Math.max(0, tilt) * 0.75, K = 3;
+    const KX = c.x + 0.46, KY = c.top + 0.3, KZ = S.corner.userData.cupZ;
+    kettle.position.set(KX, KY, KZ);
     kettle.rotation.z = ang;
-    if (p < 0.9 && tilt > 0.5) {
+    const fill = Math.min(1, Math.max(0, (local - 0.12) / 0.7));
+    for (let q = 0; q < n; q++) {                                              // cups before this one are full, later ones still empty
+      const lv = q < k ? 1 : q === k ? fill : 0, w = cups[q].water;
+      w.visible = lv > 0.01; w.scale.y = Math.max(0.001, lv); w.position.y = cups[q].base + cups[q].fill * lv / 2;
+    }
+    if (p < 1 && tilt > 0.5) {
       pour.acc += dt * 38;
       while (pour.acc >= 1) {
         pour.acc -= 1;
         const i = dropLife.findIndex((l) => l <= 0);
         if (i < 0) break;
         // the spout tip, turned with the kettle
-        const tipx = KX + K * (-0.105 * Math.cos(ang) - 0.045 * Math.sin(ang)), tipy = 1.72 + K * (-0.105 * Math.sin(ang) + 0.045 * Math.cos(ang));
-        dropPos.set([tipx, tipy, KZ + (Math.random() - 0.5) * 0.04], i * 3);
-        dropVel.set([-0.3 - Math.random() * 0.15, 0, (Math.random() - 0.5) * 0.1], i * 3);
-        dropLife[i] = 1;
+        const tipx = KX + K * (-0.105 * Math.cos(ang) - 0.045 * Math.sin(ang)), tipy = KY + K * (-0.105 * Math.sin(ang) + 0.045 * Math.cos(ang));
+        dropPos.set([tipx, tipy, KZ + (Math.random() - 0.5) * 0.01], i * 3);
+        dropVel.set([-0.15 - Math.random() * 0.05, 0, 0], i * 3);
+        dropLife[i] = 1; dropStop[i] = 0.08;
       }
     }
-    if (pour.t >= pour.dur) { pour = null; kettle.visible = false; }
+    if (pour.t >= pour.dur) { pour = null; kettle.visible = false; cups.forEach((q) => { q.water.visible = true; q.water.scale.y = 1; q.water.position.y = q.base + q.fill / 2; }); }
+  }
+  // blessing: the golden cup waters the Buddha image first, then the day animal
+  if (bless && S.corner) {
+    bless.t += dt;
+    const p = Math.min(1, bless.t / bless.dur), first = p < 0.5, local = first ? p * 2 : (p - 0.5) * 2;
+    const tilt = Math.max(0, Math.min(1, local * 5, (1 - local) * 5)), ang = tilt * 1.05, s = 1.5;
+    const tip = first ? [0.02, 3.62, -0.45] : [0.3, 1.6, 1.0];                    // where the rim should be
+    const ox = s * (-0.11 * Math.cos(ang) - 0.24 * Math.sin(ang)), oy = s * (-0.11 * Math.sin(ang) + 0.24 * Math.cos(ang));
+    dipper.position.set(tip[0] - ox, tip[1] - oy, tip[2]);
+    dipper.rotation.z = ang;
+    if (tilt > 0.6 && p < 1) {
+      bless.acc += dt * 34;
+      while (bless.acc >= 1) {
+        bless.acc -= 1;
+        const i = dropLife.findIndex((l) => l <= 0);
+        if (i < 0) break;
+        dropPos.set([tip[0], tip[1], tip[2] + (Math.random() - 0.5) * 0.04], i * 3);
+        dropVel.set([-0.1 - Math.random() * (first ? 0.1 : 0.3), 0, (Math.random() - 0.5) * 0.06], i * 3);
+        dropLife[i] = 1; dropStop[i] = first ? 3.4 : 0.08;
+      }
+    }
+    if (bless.t >= bless.dur) { bless = null; dipper.visible = false; }
   }
   for (let i = 0; i < DROPS; i++) {
     if (dropLife[i] <= 0) continue;
     dropVel[3 * i + 1] -= 4.8 * dt;
     dropPos[3 * i] += dropVel[3 * i] * dt; dropPos[3 * i + 1] += dropVel[3 * i + 1] * dt; dropPos[3 * i + 2] += dropVel[3 * i + 2] * dt;
-    if (dropPos[3 * i + 1] < 0.08) { dropLife[i] = 0; dropPos.set([0, -100, 0], 3 * i); }
+    if (dropPos[3 * i + 1] < dropStop[i]) { dropLife[i] = 0; dropPos.set([0, -100, 0], 3 * i); }
   }
   dropGeo.attributes.position.needsUpdate = true;
 
