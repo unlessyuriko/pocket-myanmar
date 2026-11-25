@@ -767,6 +767,7 @@ $("#btnAR").onclick = async () => {
 // opened with the day already chosen on the home page: straight to the camera, no second start screen
 if (new URLSearchParams(location.search).has("go") && pickedDay != null) {
   $("#intro").hidden = true;
+  document.documentElement.classList.remove("go");
   history.replaceState(null, "", location.pathname);
   begin(true);
 }

@@ -25,6 +25,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <script>
+    /* opened from the home page with a day already chosen: never draw the start screen at all */
+    try { if (/[?&]go\b/.test(location.search) && localStorage.getItem("mv.day") !== null) document.documentElement.classList.add("go"); } catch (e) {}
+  </script>
+  <style>html.go #intro { display: none !important; }</style>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="pagoda.css" />
   <script type="importmap">
