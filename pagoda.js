@@ -374,34 +374,40 @@ const Sound = (() => {
       };
       [1, 0.95, 0.9].forEach((k, i) => strike(t0 + i * 1.5, k));    // "tong.... tong.... tong" one and a half seconds apart
     },
-    // water poured slowly from a jar: a soft, low stream that swells and fades, with small round drops and a gentle echo.
-    // Nothing hissy or sharp: it is meant to be calming.
+    // water poured slowly from a jar into a cup: a thin, unhurried trickle of small round drops that thins out at the end,
+    // with only a whisper of flowing water under it. No rushing noise, so it never sounds like a waterfall.
     pour(len = 3.6) {
       const c = get(); if (!c) return; const t = c.currentTime + 0.25;
-      const out = c.createGain(); out.gain.setValueAtTime(0, t);
-      out.gain.linearRampToValueAtTime(1, t + 1.4); out.gain.setValueAtTime(1, t + len - 1.6); out.gain.linearRampToValueAtTime(0, t + len);
-      const echo = c.createDelay(); echo.delayTime.value = 0.4;
-      const fb = c.createGain(); fb.gain.value = 0.3;
-      const damp = c.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 800;
+      const out = c.createGain(); out.gain.value = 0.9;
+      const echo = c.createDelay(); echo.delayTime.value = 0.22;
+      const fb = c.createGain(); fb.gain.value = 0.28;
+      const damp = c.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 1300;
       out.connect(c.destination); out.connect(echo); echo.connect(damp); damp.connect(fb); fb.connect(echo); damp.connect(c.destination);
-      // the stream: soft brown noise (no high hiss), kept low and drifting a little
+      // a very faint, low trickle of flowing water under the drops (just enough to feel wet, not a rush)
       const n = Math.ceil(c.sampleRate * (len + 0.5)), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
       let last = 0;
       for (let i = 0; i < n; i++) { last = last * 0.985 + (Math.random() * 2 - 1) * 0.015; d[i] = last * 7; }
       const src = c.createBufferSource(); src.buffer = buf;
-      const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 380; bp.Q.value = 0.5;
-      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 650;
-      const sg = c.createGain(); sg.gain.value = 0.05;                                   // very soft, like a slow wave rolling in and out
-      const lfo = c.createOscillator(), la = c.createGain(); lfo.frequency.value = 0.3; la.gain.value = 0.02; lfo.connect(la).connect(sg.gain); lfo.start(t); lfo.stop(t + len + 0.2);
-      src.connect(bp).connect(lp).connect(sg).connect(out); src.start(t); src.stop(t + len + 0.3);
-      // drops: round little "plip" notes, quiet and unhurried
-      const drops = Math.round(len * 1.6);
-      for (let i = 0; i < drops; i++) {
-        const dt = t + 0.8 + Math.random() * (len - 2), f = rnd(380, 720), dl = rnd(0.12, 0.2);
-        const o = c.createOscillator(), g = c.createGain(), p = pan(c, out, rnd(-0.4, 0.4));
-        o.type = "sine"; o.frequency.setValueAtTime(f, dt); o.frequency.exponentialRampToValueAtTime(f * 1.5, dt + dl * 0.7);
-        g.gain.setValueAtTime(0, dt); g.gain.linearRampToValueAtTime(rnd(0.004, 0.01), dt + 0.03); g.gain.exponentialRampToValueAtTime(0.0005, dt + dl);
-        o.connect(g).connect(p); o.start(dt); o.stop(dt + dl + 0.05);
+      const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 600; bp.Q.value = 0.8;
+      const sg = c.createGain();
+      sg.gain.setValueAtTime(0, t); sg.gain.linearRampToValueAtTime(0.012, t + 1.2); sg.gain.setValueAtTime(0.012, t + len - 1.4); sg.gain.linearRampToValueAtTime(0, t + len);
+      src.connect(bp).connect(sg).connect(out); src.start(t); src.stop(t + len + 0.3);
+      // the trickle: small rising "plip" drops, quick in the middle and spaced out near the start and the end
+      let dt = t + 0.35;
+      while (dt < t + len - 0.5) {
+        const u = (dt - t) / len, busy = Math.sin(Math.PI * Math.min(1, Math.max(0, u)));       // 0 at the ends, 1 in the middle
+        const f = rnd(700, 1500), dl = rnd(0.05, 0.1), a = rnd(0.004, 0.012) * (0.4 + 0.6 * busy);
+        const o = c.createOscillator(), g = c.createGain(), p = pan(c, out, rnd(-0.3, 0.3));
+        o.type = "sine"; o.frequency.setValueAtTime(f, dt); o.frequency.exponentialRampToValueAtTime(f * 1.7, dt + dl * 0.8);
+        g.gain.setValueAtTime(0, dt); g.gain.linearRampToValueAtTime(a, dt + 0.008); g.gain.exponentialRampToValueAtTime(0.0004, dt + dl);
+        o.connect(g).connect(p); o.start(dt); o.stop(dt + dl + 0.03);
+        dt += rnd(0.045, 0.11) / (0.35 + 0.65 * busy);
+      }
+      // the last few slow drips falling into the cup: lower, rounder, and further apart
+      for (let i = 0; i < 3; i++) {
+        const t2 = t + len - 0.5 + i * rnd(0.3, 0.45), f = 520 - i * 50;
+        partial(c, t2, f, 0.012 - i * 0.003, 0.28, "sine", out);
+        partial(c, t2 + 0.02, f * 2, 0.004, 0.18, "sine", out);
       }
     },
     flame() { const c = get(); if (!c) return; const t = c.currentTime; partial(c, t, 880, 0.05, 0.5); partial(c, t + 0.08, 1320, 0.035, 0.6); },
