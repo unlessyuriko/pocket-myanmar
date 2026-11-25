@@ -13,7 +13,7 @@ export const BRAND = {
   FEEDBACK_CC: "maythuhan96@gmail.com",           // second inbox (FormSubmit "_cc")
 };
 
-const LOGO = "brand/mytechnomad-wide-dark.svg";
+const LOGO = "brand/mytechnomad-wide-dark.webp";
 const SHOT = { sx: 0.07, sy: 0.2, sw: 0.86, sh: 0.6 };           // the logo file has clear space around it; this is the part with ink
 export const LOGO_ASPECT = (SHOT.sw * 1630) / (SHOT.sh * 623);        // about 3.75
 

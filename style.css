@@ -348,11 +348,11 @@ button { font: inherit; color: inherit; }
 /* "Made by MY Technomad" */
 .made-by { display: grid; justify-items: center; gap: 4px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--ring); width: 100%; }
 .mb-label { font-size: 12px; letter-spacing: 0.04em; color: var(--muted); }
-.mt-logo { width: 120px; height: auto; aspect-ratio: 3.75; object-fit: cover; display: block; }
+.mt-logo { width: 120px; height: auto; aspect-ratio: 3.87; object-fit: contain; display: block; }
 .made-by a { display: inline-flex; }
 .mb-cta { min-height: 40px; padding: 6px 16px; font-size: 14px; margin-top: 6px; text-decoration: none; }
 .sheet-card .made-by { border-top: 0; margin-top: 0; padding-top: 0; }
-.sheet-card .made-by .mt-logo { width: 130px; height: auto; max-height: none; border: 0; border-radius: 0; box-shadow: none; background: none; outline: 0; object-fit: cover; }
+.sheet-card .made-by .mt-logo { width: 130px; height: auto; max-height: none; border: 0; border-radius: 0; box-shadow: none; background: none; outline: 0; object-fit: contain; }
 .made-by .mt-logo { width: 150px; }
 .sheet-card .made-by .mt-logo { width: 130px; }
 
