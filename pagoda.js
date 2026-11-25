@@ -374,16 +374,35 @@ const Sound = (() => {
       };
       [1, 0.95, 0.9].forEach((k, i) => strike(t0 + i * 1.5, k));    // "tong.... tong.... tong" one and a half seconds apart
     },
-    pour() {
-      const c = get(); if (!c) return; const t = c.currentTime, len = 2.4;
-      const buf = c.createBuffer(1, c.sampleRate * len, c.sampleRate), d = buf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    // water poured slowly from a jar: a soft, low stream that swells and fades, with small round drops and a gentle echo.
+    // Nothing hissy or sharp: it is meant to be calming.
+    pour(len = 3.6) {
+      const c = get(); if (!c) return; const t = c.currentTime + 0.25;
+      const out = c.createGain(); out.gain.setValueAtTime(0, t);
+      out.gain.linearRampToValueAtTime(1, t + 0.9); out.gain.setValueAtTime(1, t + len - 1.1); out.gain.linearRampToValueAtTime(0, t + len);
+      const echo = c.createDelay(); echo.delayTime.value = 0.27;
+      const fb = c.createGain(); fb.gain.value = 0.3;
+      const damp = c.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 1500;
+      out.connect(c.destination); out.connect(echo); echo.connect(damp); damp.connect(fb); fb.connect(echo); damp.connect(c.destination);
+      // the stream: soft brown noise (no high hiss), kept low and drifting a little
+      const n = Math.ceil(c.sampleRate * (len + 0.5)), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < n; i++) { last = last * 0.985 + (Math.random() * 2 - 1) * 0.015; d[i] = last * 7; }
       const src = c.createBufferSource(); src.buffer = buf;
-      const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1500; bp.Q.value = 0.7;
-      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3200;
-      const g = c.createGain();
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18, t + 0.4); g.gain.setValueAtTime(0.18, t + len - 0.7); g.gain.linearRampToValueAtTime(0, t + len);
-      src.connect(bp).connect(lp).connect(g).connect(c.destination); src.start(t);
+      const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 520; bp.Q.value = 0.6;
+      const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 1100;
+      const sg = c.createGain(); sg.gain.value = 0.2;
+      const lfo = c.createOscillator(), la = c.createGain(); lfo.frequency.value = 0.7; la.gain.value = 0.05; lfo.connect(la).connect(sg.gain); lfo.start(t); lfo.stop(t + len + 0.2);
+      src.connect(bp).connect(lp).connect(sg).connect(out); src.start(t); src.stop(t + len + 0.3);
+      // drops: round little "plip" notes, quiet and unhurried
+      const drops = Math.round(len * 5);
+      for (let i = 0; i < drops; i++) {
+        const dt = t + 0.5 + Math.random() * (len - 1.2), f = rnd(520, 1100), dl = rnd(0.07, 0.13);
+        const o = c.createOscillator(), g = c.createGain(), p = pan(c, out, rnd(-0.4, 0.4));
+        o.type = "sine"; o.frequency.setValueAtTime(f, dt); o.frequency.exponentialRampToValueAtTime(f * 1.5, dt + dl * 0.7);
+        g.gain.setValueAtTime(0, dt); g.gain.linearRampToValueAtTime(rnd(0.012, 0.028), dt + 0.012); g.gain.exponentialRampToValueAtTime(0.0005, dt + dl);
+        o.connect(g).connect(p); o.start(dt); o.stop(dt + dl + 0.05);
+      }
     },
     flame() { const c = get(); if (!c) return; const t = c.currentTime; partial(c, t, 880, 0.05, 0.5); partial(c, t + 0.08, 1320, 0.035, 0.6); },
     petals() { const c = get(); if (!c) return; const t = c.currentTime; partial(c, t, 1046, 0.05, 0.4, "triangle"); },
@@ -425,9 +444,14 @@ function pickDay(i) {
   $("#btnStart").disabled = false;
 }
 if (savedDay != null && DAYS[savedDay]) {
-  pickDay(savedDay);                                  // chosen on the start page: just confirm it
-  $(".intro-card").classList.add("known");
-  $("#pickLabel").textContent = "သင့်နေ့နံ — မှန်ရင် စမယ်ကို နှိပ်ပါ";
+  pickDay(savedDay);                                  // already chosen on the start page: no need to pick again
+  const card = $(".intro-card"), d0 = DAYS[savedDay];
+  card.classList.add("known");
+  $("#pickLabel").textContent = `${d0.day} · ${d0.animal}`;
+  const change = document.createElement("button");
+  change.type = "button"; change.className = "textlink"; change.textContent = "နေ့နံ ပြောင်းမယ်";
+  change.onclick = () => { card.classList.remove("known"); $("#pickLabel").textContent = "မွေးနေ့ ရွေးပါ"; change.remove(); };
+  $("#pickLabel").after(change);
 }
 
 let changingDay = false;
@@ -581,14 +605,15 @@ $("#offBless").onclick = () => {
   if (pour || bless || !S.corner) return;
   bless = { t: 0, dur: 6.4, acc: 0 };
   dipper.visible = true;
-  Sound.pour();
+  Sound.pour(2.6);                              // once for the Buddha image, once for the day animal
+  setTimeout(() => { if (bless) Sound.pour(2.6); }, 3200);
   offered("bless");
 };
 $("#offWater").onclick = () => {
   if (pour || bless || !S.corner) return;
   pour = { t: 0, dur: 4.2, acc: 0 };
   kettle.visible = true;
-  Sound.pour();
+  Sound.pour(4);
   offered("water");
 };
 $("#offLamp").onclick = () => {
@@ -683,11 +708,11 @@ function setScale(s) {
 $("#size").oninput = (e) => setScale(+e.target.value);
 
 // ---------- start and navigation ----------
-$("#btnStart").onclick = async () => {
+async function begin(auto) {
   if (pickedDay == null) return;
   Sound.unlock();
   Sound.ambient();
-  setTimeout(() => { if (Sound.state !== "running" && !Sound.muted) flash("အသံမကြားရရင် ဖုန်းကို silent မဟုတ်အောင်ပြင်ပြီး 🔊 ကို နှိပ်ပါ", 5000); }, 1200);
+  if (!auto) setTimeout(() => { if (Sound.state !== "running" && !Sound.muted) flash("အသံမကြားရရင် ဖုန်းကို silent မဟုတ်အောင်ပြင်ပြီး 🔊 ကို နှိပ်ပါ", 5000); }, 1200);
   selectDay(pickedDay, true);
   $("#intro").hidden = true;
   if (changingDay) {                                  // just switching to another day's shrine
@@ -700,7 +725,7 @@ $("#btnStart").onclick = async () => {
   S.phase = "place";
   setTimeout(() => { if (S.phase === "place") flash("မြေပြင်ပေါ် မတင်ပါနဲ့ — ရိုသေစွာ မြင့်တဲ့နေရာမှာ တင်ပါ", 4200); }, 1500);
   // Phone AR (Android Chrome) finds the real surface. It has to be asked for straight from the tap.
-  if (xrOK) {
+  if (xrOK && !auto) {                                // opened from the home page there was no tap on this page, so the phone would refuse
     setHint("ဖုန်းကို စားပွဲဆီ ညွှန်ပါ။ ရွှေရောင်စက်ဝိုင်း ပေါ်လာရင် တစ်ချက်ထိပါ");
     if (await startXR()) return;
   }
@@ -715,7 +740,30 @@ $("#btnStart").onclick = async () => {
   setTimeout(() => {
     if (S.phase === "place" && !S.gyro) setHint("ဖုန်းမလှုပ်ရင် ဆွဲပြီး ကြည့်ပါ၊ ပြီးရင် တစ်ချက်ထိပါ");
   }, 2500);
+  if (auto) {                                         // phone AR and the motion sensors need a tap on this page: offer it as a button
+    setTimeout(() => {
+      const needsTap = typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
+      if ((xrOK || needsTap) && !S.xr && !S.gyro) $("#btnAR").hidden = false;
+    }, 1800);
+  }
+}
+$("#btnStart").onclick = () => begin(false);
+$("#btnAR").onclick = async () => {
+  $("#btnAR").hidden = true;
+  Sound.unlock(); Sound.ambient();
+  if (xrOK && await startXR()) {
+    S.phase = "place"; S.placed = false; world.visible = false;
+    setHint("ဖုန်းကို စားပွဲဆီ ညွှန်ပါ။ ရွှေရောင်စက်ဝိုင်း ပေါ်လာရင် တစ်ချက်ထိပါ");
+    return;
+  }
+  startSensors();
 };
+// opened with the day already chosen on the home page: straight to the camera, no second start screen
+if (new URLSearchParams(location.search).has("go") && pickedDay != null) {
+  $("#intro").hidden = true;
+  history.replaceState(null, "", location.pathname);
+  begin(true);
+}
 $("#btnReplace").onclick = () => {
   S.phase = "place"; S.placed = false; world.visible = false;
   setHint(S.xr ? "ဖုန်းကို စားပွဲဆီ ညွှန်ပြီး စက်ဝိုင်းပေါ်မှာ တစ်ချက်ထိပါ" : "နေရာအသစ်မှာ တစ်ချက်ထိပြီး တင်ပါ");

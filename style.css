@@ -428,7 +428,7 @@ button { font: inherit; color: inherit; }
 .icon-btn[hidden] { display: none; }
 .sheet-next { display: grid; justify-items: center; gap: 8px; }
 .sheet-next .btn { width: 100%; }
-.pagoda .intro-card.known .lead { display: none; }
+.pagoda .intro-card.known .lead, .pagoda .intro-card.known .days { display: none; }
 @media (max-height: 840px) { .wd { width: 44px; height: 44px; margin: -22px 0 0 -22px; } .intro > .made-by .mt-logo { width: 118px; } }
 
 /* illustrated icons */
@@ -450,7 +450,7 @@ button { font: inherit; color: inherit; }
 .btn-chip img { width: 26px; height: 26px; object-fit: contain; }
 .btn-label { text-align: center; }
 .landing .btn.has-chip { width: 100%; max-width: 300px; }
-.pagoda .topbar { justify-content: flex-start; gap: 12px; }
+.topbar { justify-content: flex-start; gap: 12px; }
 .btn-chip { background: none; border: 0; box-shadow: none; width: 44px; height: 44px; margin-top: -22px; left: 10px; }
 .btn-chip img { width: 38px; height: 38px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
 .back-btn { border: 0; background: none; box-shadow: none; }
@@ -476,3 +476,5 @@ button.textlink { background: none; border: 0; font: inherit; font-size: 14px; }
 
 /* company font (MY Signature, one weight) for the app name */
 .brand-en { font-family: "MY Signature", "Playfair Display", Georgia, serif; font-weight: 400; letter-spacing: 0.01em; font-size: clamp(18px, 5.6vw, 22px); }
+.pill[hidden] { display: none; }
+.pill[hidden] { display: none; }

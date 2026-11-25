@@ -44,6 +44,7 @@
         <img class="brand-logo" src="flag.svg" alt="" width="30" height="30" />
         <span class="brand-en">MyanmarVibe</span>
       </div>
+      <button class="sound-btn" id="btnSound" type="button" aria-pressed="true" aria-label="နောက်ခံအသံ ပိတ်မယ်"></button>
     </header>
 
     <section class="stage" id="stage">
@@ -54,8 +55,6 @@
         <span class="chip" id="chipMerit"></span>
         <span class="chip" id="chipTime"></span>
       </div>
-
-      <button class="sound-btn" id="btnSound" type="button" aria-pressed="true" aria-label="နောက်ခံအသံ ပိတ်မယ်"></button>
 
       <div class="hint" id="hint" role="status" aria-live="polite" hidden></div>
       <div class="sadhu" id="sadhu" aria-live="assertive" hidden>
@@ -93,6 +92,7 @@
       <div class="row controls tools">
         <button class="pill" id="btnReplace" disabled>နေရာပြန်ချ</button>
         <button class="pill" id="btnDay" disabled>နေ့နံပြောင်းမည်</button>
+        <button class="pill" id="btnAR" hidden>AR နဲ့ ကြည့်မယ်</button>
         <label class="strength">
           <span>အရွယ်</span>
           <input id="size" type="range" min="0.04" max="0.3" step="0.005" value="0.12" aria-label="ဘုရားအရွယ်အစား" />

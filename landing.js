@@ -35,6 +35,8 @@ if (wheel) {
     if (save) { try { localStorage.setItem("mv.day", JSON.stringify(i)); } catch { /* private mode */ } }
   }
   pick(sel, false);
+  const go = $("#goPagoda");                      // the pagoda page then opens straight on the camera with this day
+  if (go) go.addEventListener("click", () => { pick(sel, true); go.setAttribute("href", "pagoda.html?go=1"); });
 
   // arrow keys move around the wheel
   wheel.addEventListener("keydown", (e) => {
@@ -44,10 +46,4 @@ if (wheel) {
     const n = (sel + k + DAYS.length) % DAYS.length;
     pick(n, true); dots[n].focus();
   });
-
-  // merit kept by the pagoda page, on this phone only
-  try {
-    const m = JSON.parse(localStorage.getItem("mv.merit"));
-    if (m && m.total > 0) { const el = $("#merit"); el.textContent = `ကုသိုလ် ${mm(m.total)} · ဘုရားဖူးသည့်ရက် ${mm((m.days || []).length)}`; el.hidden = false; }
-  } catch { /* ignore */ }
 }
