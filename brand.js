@@ -72,7 +72,7 @@ function openFeedback() {
         <h2 class="fb-title">သင့်အကြံပြုချက်</h2>
         <p class="fb-sub">ဘယ်လောက် နှစ်သက်ပါသလဲ?</p>
         <div class="fb-rate" role="radiogroup" aria-label="အဆင့်သတ်မှတ်ရန်">
-          ${["😞","😕","🙂","😀","🤩"].map((e, i) => `<button type="button" role="radio" aria-checked="false" data-v="${i + 1}" aria-label="${i + 1} / 5">${e}</button>`).join("")}
+          ${[1, 2, 3, 4, 5].map((n) => `<button type="button" role="radio" aria-checked="false" data-v="${n}" aria-label="${n} / 5"><img src="icons/fb${n}.webp" alt="" width="40" height="40" /></button>`).join("")}
         </div>
         <textarea name="message" rows="4" maxlength="1000" placeholder="ဘာတွေ ကောင်းပါသလဲ၊ ဘာတွေ ပြင်သင့်ပါသလဲ" aria-label="အကြံပြုချက်"></textarea>
         <input name="contact" type="text" maxlength="120" placeholder="ဆက်သွယ်ရန် (ဖုန်း / အီးမေးလ် · မဖြည့်လည်းရ)" aria-label="ဆက်သွယ်ရန်" autocomplete="off" />
@@ -81,9 +81,7 @@ function openFeedback() {
         <div class="sheet-actions fb-actions">
           <button type="submit" class="btn primary">ပို့မယ်</button>
           <button type="button" class="btn ghost fb-close">ပိတ်မယ်</button>
-        </div>
-        <small class="fb-fine">ပို့မှသာ သင့်စာကို လက်ခံရရှိပါမယ်။ ကင်မရာပုံ မပါပါဘူး။</small>
-      </form>`;
+        </div>      </form>`;
     document.body.append(feedbackSheet);
     const form = feedbackSheet.querySelector("form"), note = form.querySelector(".fb-note");
     let rating = 0;
@@ -104,9 +102,9 @@ function openFeedback() {
       const btn = form.querySelector("button[type=submit]"); btn.disabled = true; note.textContent = "ပို့နေပါတယ်…";
       try {
         const r = await fetch(BRAND.FEEDBACK_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ _subject: "Myanmar Vibe feedback", _template: "table", _captcha: "false", ...(BRAND.FEEDBACK_CC ? { _cc: BRAND.FEEDBACK_CC } : {}), rating, message, contact: form.contact.value.trim(), page: location.pathname, screen: `${innerWidth}x${innerHeight}`, ua: navigator.userAgent.slice(0, 160), time: new Date().toISOString() }) });
+          body: JSON.stringify({ _subject: "MyanmarVibe feedback", _template: "table", _captcha: "false", ...(BRAND.FEEDBACK_CC ? { _cc: BRAND.FEEDBACK_CC } : {}), rating, message, contact: form.contact.value.trim(), page: location.pathname, screen: `${innerWidth}x${innerHeight}`, ua: navigator.userAgent.slice(0, 160), time: new Date().toISOString() }) });
         if (!r.ok) throw new Error(r.status);
-        note.textContent = "ကျေးဇူးတင်ပါတယ်! 🙏"; form.reset(); rating = 0;
+        note.innerHTML = 'ကျေးဇူးတင်ပါတယ်! <img class="fb-ico" src="icons/thanks.webp" alt="" width="22" height="22" />'; form.reset(); rating = 0;
         form.querySelectorAll(".fb-rate button").forEach((x) => x.setAttribute("aria-checked", "false"));
         setTimeout(close, 1600);
       } catch { note.textContent = "မပို့နိုင်ပါ၊ နောက်မှ ပြန်ကြိုးစားပါ"; }
@@ -131,7 +129,8 @@ export function mountBrand() {
     sheet.append(next);
   }
   if (card && feedbackOn() && !/pagoda/.test(location.pathname)) {      // feedback lives on the main landing screen only
-    const fb = el("button", "fb-open", "💬 အကြံပြုချက် ပေးမယ်");
+    const fb = el("button", "fb-open");
+    fb.innerHTML = '<img class="fb-ico" src="icons/fb-chat.webp" alt="" width="22" height="22" /> အကြံပြုချက် ပေးမယ်';
     fb.type = "button"; fb.onclick = openFeedback;
     card.append(fb);
   }

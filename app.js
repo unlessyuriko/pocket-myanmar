@@ -641,6 +641,7 @@ $("#btnSwitch").onclick = () => {
   appEl.classList.remove("started");
   $("#intro").hidden = false;
   $("#btnShutter").disabled = true;
+  $("#btnSwitch").hidden = true;
   $("#btnFlip").hidden = true;
   $("#btnRec").hidden = true;
   toast("");
@@ -696,7 +697,7 @@ $("#btnShutter").onclick = () => {
   // Small caption in the corner
   const fs = Math.round(out.width * 0.032);
   o.font = `600 ${fs}px "Noto Sans Myanmar", "Myanmar Text", sans-serif`;
-  const text = "Myanmar Vibe · သနပ်ခါး";
+  const text = "MyanmarVibe · သနပ်ခါး";
   const pad = fs * 0.6;
   const tw = o.measureText(text).width;
   o.fillStyle = "rgba(27,20,16,0.55)";
@@ -755,7 +756,7 @@ function startRecording() {
   // caption, drawn once and stamped on every frame
   const wm = document.createElement("canvas");
   const fs = Math.round(c.width * 0.032);
-  const text = "Myanmar Vibe · သနပ်ခါး";
+  const text = "MyanmarVibe · သနပ်ခါး";
   const wg = wm.getContext("2d");
   wg.font = `600 ${fs}px "Noto Sans Myanmar", "Myanmar Text", sans-serif`;
   const tw = wg.measureText(text).width;
@@ -823,7 +824,7 @@ $("#btnShare").onclick = async () => {
   if (!lastBlob) return;
   const file = new File([lastBlob], lastName, { type: lastType });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: "Myanmar Vibe", text: `သနပ်ခါး လိမ်းထားတယ် 🌼
+    try { await navigator.share({ files: [file], title: "MyanmarVibe", text: `သနပ်ခါး လိမ်းထားတယ် 🌼
 ${SHARE_URL()}` }); } catch {}
   } else {
     $("#btnSave").click();

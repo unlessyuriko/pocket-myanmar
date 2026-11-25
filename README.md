@@ -1,4 +1,4 @@
-# Myanmar Vibe
+# MyanmarVibe
 
 Myanmar in your pocket: small AR experiences for people who miss home, running in the phone's browser with no install.
 

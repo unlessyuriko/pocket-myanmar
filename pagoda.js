@@ -3,7 +3,7 @@
 // turn the 3D camera as you turn the phone, so the pagoda stays where you put it.
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { DAYS, makeMaterials, buildCorner, setCornerDay, buildBackdrop, TABLE_Y, addFlowers, glowTexture, preloadModel, SHARED_MODELS } from "./pagoda-model.js";
+import { DAYS, makeMaterials, buildCorner, setCornerDay, buildBackdrop, TABLE_Y, addFlowers, glowTexture, preloadModel, loadModel, SHARED_MODELS } from "./pagoda-model.js";
 import { showGuards } from "./guard.js";
 import { iconSvg } from "./icons.js";
 import { mountBrand, SHARE_URL } from "./brand.js";
@@ -133,6 +133,7 @@ async function buildTheCorner() {
 }
 
 // the kettle and the water that falls from it
+const JAR_H = 0.2, JAR_TIP = [-0.082, 0.041];             // jar height and where its spout tip sits from the middle of the jar
 const kettle = new THREE.Group();
 {
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.055, 18, 14), mats.gold);
@@ -144,6 +145,8 @@ const kettle = new THREE.Group();
   kettle.add(body, spout, handle);
   kettle.scale.setScalar(3);
   kettle.visible = false;
+  // the real golden water jar replaces the simple shape once it has downloaded (pivot = middle of the jar, spout to the left)
+  loadModel("jar", JAR_H).then((o) => { o.position.y = -JAR_H / 2; kettle.clear(); kettle.add(o); }).catch(() => {});
 }
 // the golden cup used to bless the Buddha image and then the day animal
 const dipper = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.07, 0], [0.1, 0.16], [0.11, 0.24], [0.09, 0.24], [0.07, 0.14], [0, 0.02]].map(([x, y]) => new THREE.Vector2(x, y)), 24), mats.gold);
@@ -755,7 +758,7 @@ async function capture() {
   x.fillStyle = "#f9eed8"; x.font = `400 ${15 * u}px ${FONT}`;
   x.fillText(`${d.day} ${d.animal}${merit.total ? `  ·  ကုသိုလ် ${mm(merit.total)}` : ""}`, W / 2, H - 36 * u, W - 24 * u);
   x.fillStyle = "#e3b85c"; x.font = `700 ${13 * u}px "Playfair Display", Georgia, serif`;
-  x.fillText("Myanmar Vibe", W / 2, H - 13 * u);
+  x.fillText("MyanmarVibe", W / 2, H - 13 * u);
   return out;
 }
 let shot = null;
@@ -841,7 +844,7 @@ function frame(now, xrFrame) {
     const c = cups[k];
     const tilt = Math.min(1, local * 5, (1 - local) * 5 + 0.0001);
     const ang = Math.max(0, tilt) * 0.75, K = 3;
-    const KX = c.x + 0.46, KY = c.top + 0.3, KZ = S.corner.userData.cupZ;
+    const KX = c.x + 0.145 - K * JAR_TIP[0], KY = c.top + 0.3 + 0.035, KZ = S.corner.userData.cupZ;
     kettle.position.set(KX, KY, KZ);
     kettle.rotation.z = ang;
     const fill = Math.min(1, Math.max(0, (local - 0.12) / 0.7));
@@ -856,7 +859,7 @@ function frame(now, xrFrame) {
         const i = dropLife.findIndex((l) => l <= 0);
         if (i < 0) break;
         // the spout tip, turned with the kettle
-        const tipx = KX + K * (-0.105 * Math.cos(ang) - 0.045 * Math.sin(ang)), tipy = KY + K * (-0.105 * Math.sin(ang) + 0.045 * Math.cos(ang));
+        const tipx = KX + K * (JAR_TIP[0] * Math.cos(ang) - JAR_TIP[1] * Math.sin(ang)), tipy = KY + K * (JAR_TIP[0] * Math.sin(ang) + JAR_TIP[1] * Math.cos(ang));
         dropPos.set([tipx, tipy, KZ + (Math.random() - 0.5) * 0.01], i * 3);
         dropVel.set([-0.15 - Math.random() * 0.05, 0, 0], i * 3);
         dropLife[i] = 1; dropStop[i] = 0.08;

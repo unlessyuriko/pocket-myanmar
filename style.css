@@ -1,4 +1,5 @@
-/* Myanmar Vibe — velvet & gold */
+@font-face { font-family: "MY Signature"; src: url("fonts/MYSignature-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+/* MyanmarVibe — velvet & gold */
 :root {
   --bg: #1c1c1c;
   --panel: rgba(26, 26, 26, 0.82);
@@ -367,8 +368,12 @@ button { font: inherit; color: inherit; }
 .fb-title { margin: 0; font-size: 20px; color: var(--gold-hi); text-align: center; line-height: 1.8; }
 .fb-sub { margin: 0; text-align: center; color: var(--muted); }
 .fb-rate { display: flex; justify-content: center; gap: 8px; }
-.fb-rate button { width: 52px; height: 52px; border-radius: 50%; font-size: 26px; line-height: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--ring); cursor: pointer; }
-.fb-rate button[aria-checked="true"] { background: var(--gold-grad); transform: scale(1.12); }
+.fb-rate button { width: 54px; height: 54px; border-radius: 50%; padding: 0; display: grid; place-items: center; background: none; border: 0; cursor: pointer; opacity: 0.55; filter: saturate(0.6); transition: transform .15s, opacity .15s, filter .15s; }
+.fb-card .fb-rate button img, .fb-card .fb-ico { width: 46px; height: 46px; max-height: none; object-fit: contain; display: block; background: none; border: 0; border-radius: 0; box-shadow: none; outline: 0; }
+.fb-card .fb-ico { width: 22px; height: 22px; display: inline-block; }
+.fb-rate button[aria-checked="true"] { opacity: 1; filter: none; transform: scale(1.18); }
+.fb-ico { width: 22px; height: 22px; vertical-align: -5px; margin-inline-end: 4px; object-fit: contain; }
+.fb-open { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .fb-card textarea, .fb-card input[type=text] { width: 100%; background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid var(--ring); border-radius: 12px; padding: 10px 12px; font: inherit; }
 .fb-card textarea:focus-visible, .fb-card input:focus-visible, .fb-rate button:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
 .fb-actions { grid-template-columns: 1fr 1fr; }
@@ -468,3 +473,6 @@ button.textlink { background: none; border: 0; font: inherit; font-size: 14px; }
 .topbar { box-sizing: border-box; height: calc(env(safe-area-inset-top) + 64px); padding-top: env(safe-area-inset-top); padding-bottom: 0; }
 .topbar .icon-btn { flex: none; }
 @media (orientation: landscape) and (max-height: 520px) { .topbar { height: 48px; padding-top: 0; } .topbar .icon-btn { width: 38px; height: 38px; } }
+
+/* company font (MY Signature, one weight) for the app name */
+.brand-en { font-family: "MY Signature", "Playfair Display", Georgia, serif; font-weight: 400; letter-spacing: 0.01em; font-size: clamp(18px, 5.6vw, 22px); }

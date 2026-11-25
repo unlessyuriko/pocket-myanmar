@@ -13,7 +13,7 @@ gltf.setMeshoptDecoder(MeshoptDecoder);
 const rawCache = new Map();
 const MODELS = new Map([["mon", 1.45], ["tue", 1.45], ["wed", 1.6], ["rahu", 1.6], ["thu", 1.4], ["fri", 1.5], ["sat", 1.6], ["sun", 1.7]]);       // birth-day id -> height in corner units
 export const DAY_MODEL_HEIGHT = (id) => MODELS.get(id);
-export const SHARED_MODELS = ["buddha", "table", "bellframe", "bell", "shrine", "hall", "stupa", "vase", "gandama"];     // every birth day uses these
+export const SHARED_MODELS = ["buddha", "table", "bellframe", "bell", "shrine", "hall", "stupa", "vase", "gandama", "jar"];     // every birth day uses these
 // Starts downloading a file (once) and returns the loaded glTF; loadModel then only has to scale a copy.
 export function preloadModel(name) {
   if (!rawCache.has(name)) rawCache.set(name, gltf.loadAsync(`models/${name}.glb`));
