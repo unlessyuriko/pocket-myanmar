@@ -310,12 +310,12 @@ const Sound = (() => {
     let last = 0;
     for (let i = 0; i < len; i++) { last = last * 0.97 + (Math.random() * 2 - 1) * 0.03; d[i] = last * 6; }
     const wind = c.createBufferSource(); wind.buffer = buf; wind.loop = true;
-    const low = c.createBiquadFilter(); low.type = "lowpass"; low.frequency.value = 520;
-    const lg = c.createGain(); lg.gain.value = 0.07;
-    const hi = c.createBiquadFilter(); hi.type = "bandpass"; hi.frequency.value = 1700; hi.Q.value = 0.5;
-    const hg = c.createGain(); hg.gain.value = 0.014;
+    const low = c.createBiquadFilter(); low.type = "lowpass"; low.frequency.value = 340;       // only the deep, soft part of the breeze
+    const lg = c.createGain(); lg.gain.value = 0.02;
+    const hi = c.createBiquadFilter(); hi.type = "bandpass"; hi.frequency.value = 1400; hi.Q.value = 0.5;
+    const hg = c.createGain(); hg.gain.value = 0.0025;
     wind.connect(low).connect(lg).connect(master); wind.connect(hi).connect(hg).connect(master);
-    for (const [g, rate, depth] of [[lg, 0.09, 0.045], [hg, 0.13, 0.012]]) {
+    for (const [g, rate, depth] of [[lg, 0.05, 0.012], [hg, 0.07, 0.002]]) {          // it swells and fades very slowly
       const lfo = c.createOscillator(), amt = c.createGain();
       lfo.frequency.value = rate; amt.gain.value = depth; lfo.connect(amt).connect(g.gain); lfo.start();
     }
